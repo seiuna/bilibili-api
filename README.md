@@ -164,21 +164,13 @@ console.log('登录成功！');
 
 
 | API | 入口 | 功能 |
-
 |---|---|---|
-
 | 视频 | `client.video(bvid).fetch()` | 获取视频详情、数据统计 |
-
 | 评论 | `client.comment` / `new CommentArea()` | 评论翻页、发评、点赞、举报、置顶、删除 |
-
 | 用户 | `video.getUser()` / `UserQuery` | 用户卡片、等级、VIP 信息 |
-
 | 通知 | `client.notify` | 未读计数、"回复我的"、"@我的" 翻页 |
-
 | 私信 | `client.chat` | 会话列表、详情、免打扰、拦截、标记已读 |
-
 | 空间 | `client.space` | 置顶视频、代表作、TAG、公告、隐私、头图 |
-
 | 上传 | `client.upload` | 上传图片到 B 站（文件/base64/URL） |
 
 
