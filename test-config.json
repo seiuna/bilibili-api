@@ -1,0 +1,7 @@
+{
+  "cookie": "SESSDATA=test_sess; bili_jct=test_jct",
+  "refreshToken": "new_refresh",
+  "accessToken": "",
+  "tvRefreshToken": "",
+  "mid": 12345
+}

@@ -1,0 +1,29 @@
+name-template: 'v$NEXT_PATCH_VERSION'
+tag-template: 'v$NEXT_PATCH_VERSION'
+
+categories:
+  - title: 'Feature'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: 'Bug'
+    labels:
+      - 'bug'
+      - 'fix'
+  - title: 'Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+  - title: 'Maintenance'
+    labels:
+      - 'chore'
+      - 'dependencies'
+
+exclude-labels:
+  - 'skip-changelog'
+
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+
+template: |
+  ## 更新内容
+  $CHANGES
