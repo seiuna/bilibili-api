@@ -1,7 +1,8 @@
 import type { BiliClient } from '../client.js';
 import type { BiliApiResponse } from '../types.js';
-import type { ReplyEntry, ReplyMainData, ReplyAddResult } from './types.js';
-import type { UploadImageResult } from './upload.js';
+import type { ReplyAddResult, ReplyEntry, ReplyType } from './types.js';
+import type { UploadAPI, UploadImageResult } from './upload.js';
+import type { ReplyPage } from './comment.js';
 import {
   ReplySort,
   ReplyAction,
@@ -9,70 +10,44 @@ import {
   ReplyTopAction,
   ReplyReportReason,
 } from './types.js';
-import { CommentResult } from '../queries/results.js';
 
 // ==========================================
-// CommentArea — 评论区对象
-// 绑定 oid + type，提供 .list() 翻页 + 全部 CRUD
+// CommentArea — 绑定到具体评论区（oid + replyType）的高层封装
+// 翻页/操作默认委托给 {@link CommentAPI}，发评额外支持图片
 // ==========================================
-
-export interface ReplyPage {
-  page: number;
-  comments: CommentResult[];
-  hots: CommentResult[] | null;
-}
 
 export class CommentArea {
+  /**
+   * @param client - BiliClient 实例
+   * @param oid - 评论区对象 ID（视频 aid、动态 id 等），对应 {@link ReplyEntry.oid}
+   * @param replyType - 评论区类型，见 {@link ReplyType}
+   */
   constructor(
     private client: BiliClient,
     private oid: number,
-    private replyType: number = 11,
+    private replyType: number,
   ) {}
 
-  /** 评论区翻页 — async generator */
+  /**
+   * 评论区翻页 — async generator
+   * @param sort - 排序方式
+   * @param pageSize - 每页条数，最大 20
+   * @param nohot - 是否不包含热评
+   */
   async *list(
     sort: ReplySort = ReplySort.TIME,
     pageSize: number = 20,
     nohot: 0 | 1 = 0,
   ): AsyncGenerator<ReplyPage> {
-    let pn = 1;
-    let totalPages: number | null = null;
-
-    while (true) {
-      const params = new URLSearchParams({
-        type: String(this.replyType),
-        oid: String(this.oid),
-        sort: String(sort),
-        nohot: String(nohot),
-        ps: String(Math.min(pageSize, 20)),
-        pn: String(pn),
-      });
-
-      const url = `https://api.bilibili.com/x/v2/reply?${params.toString()}`;
-      const data = await this.client.request<BiliApiResponse<ReplyMainData>>(url);
-
-      if (data.code !== 0) break;
-
-      const page = data.data.page;
-      if (totalPages === null) totalPages = Math.ceil(page.acount / page.size);
-
-      const comments = (data.data.replies ?? []).map(
-        r => new CommentResult(this.client, r, this.oid),
-      );
-      const hots = data.data.hots
-        ? data.data.hots.map(r => new CommentResult(this.client, r, this.oid))
-        : null;
-
-      if (comments.length) yield { page: pn, comments, hots };
-
-      if (pn >= (totalPages ?? 1) || !comments.length) break;
-      pn++;
-    }
+    yield* this.client.comment.replies(this.oid, this.replyType, sort, nohot, pageSize);
   }
 
   /**
-   * 发表评论
-   * @param pictures — 图片列表（先通过 client.upload.image() 上传获取）
+   * 发表评论（支持图片）
+   * @param message - 评论内容
+   * @param root - 一级评论 ID（回复时必填），{@link ReplyEntry.rpid}
+   * @param parent - 被回复评论 ID，{@link ReplyEntry.rpid}
+   * @param pictures - 图片列表（先通过 {@link UploadAPI.image} 上传获取）
    */
   async add(
     message: string,
@@ -82,7 +57,11 @@ export class CommentArea {
   ): Promise<BiliApiResponse<ReplyAddResult>> {
     const csrf = this.csrf();
     const body = new URLSearchParams({
-      type: String(11), oid: String(this.oid), message, plat: '1', csrf,
+      type: String(this.replyType),
+      oid: String(this.oid),
+      message,
+      plat: '1',
+      csrf,
     });
     if (root > 0) body.set('root', String(root));
     if (parent > 0) body.set('parent', String(parent));
@@ -98,52 +77,79 @@ export class CommentArea {
       body.set('pictures', JSON.stringify(mapped));
     }
 
-    return this.  client.checkedRequest<BiliApiResponse<ReplyAddResult>>(
+    return this.client.checkedRequest<BiliApiResponse<ReplyAddResult>>(
       'https://api.bilibili.com/x/v2/reply/add',
       { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() },
     );
   }
 
-  /** 点赞 / 取消 */
+  /**
+   * 点赞 / 取消
+   * @param rpid - 评论 ID，{@link ReplyEntry.rpid}
+   * @param unlike - 是否取消点赞
+   */
   async like(rpid: number, unlike = false): Promise<BiliApiResponse<null>> {
-    return this.action('https://api.bilibili.com/x/v2/reply/action', rpid, unlike ? ReplyAction.UNLIKE : ReplyAction.LIKE);
+    return this.client.comment.like(
+      this.oid,
+      rpid,
+      unlike ? ReplyAction.UNLIKE : ReplyAction.LIKE,
+      this.replyType,
+    );
   }
 
-  /** 点踩 / 取消 */
+  /**
+   * 点踩 / 取消
+   * @param rpid - 评论 ID，{@link ReplyEntry.rpid}
+   * @param unhate - 是否取消点踩
+   */
   async hate(rpid: number, unhate = false): Promise<BiliApiResponse<null>> {
-    return this.action('https://api.bilibili.com/x/v2/reply/hate', rpid, unhate ? ReplyHateAction.UNHATE : ReplyHateAction.HATE);
+    return this.client.comment.hate(
+      this.oid,
+      rpid,
+      unhate ? ReplyHateAction.UNHATE : ReplyHateAction.HATE,
+      this.replyType,
+    );
   }
 
-  /** 删除评论 */
+  /**
+   * 删除评论
+   * @param rpid - 评论 ID，{@link ReplyEntry.rpid}
+   */
   async delete(rpid: number): Promise<BiliApiResponse<null>> {
-    const csrf = this.csrf();
-    return this.client.checkedRequest<BiliApiResponse<null>>('https://api.bilibili.com/x/v2/reply/del', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ type: String(this.replyType), oid: String(this.oid), rpid: String(rpid), csrf }).toString(),
-    });
+    return this.client.comment.delete(this.oid, rpid, this.replyType);
   }
 
-  /** 置顶 / 取消（仅一级评论） */
+  /**
+   * 置顶 / 取消（仅一级评论）
+   * @param rpid - 评论 ID，{@link ReplyEntry.rpid}
+   * @param untop - 是否取消置顶
+   */
   async top(rpid: number, untop = false): Promise<BiliApiResponse<null>> {
-    return this.action('https://api.bilibili.com/x/v2/reply/top', rpid, untop ? ReplyTopAction.UNTOP : ReplyTopAction.TOP);
+    return this.client.comment.top(
+      this.oid,
+      rpid,
+      untop ? ReplyTopAction.UNTOP : ReplyTopAction.TOP,
+      this.replyType,
+    );
   }
 
-  /** 举报 */
-  async report(rpid: number, reason: ReplyReportReason = ReplyReportReason.SPAM, content?: string): Promise<BiliApiResponse<null>> {
-    const csrf = this.csrf();
-    const body = new URLSearchParams({ type: String(this.replyType), oid: String(this.oid), rpid: String(rpid), reason: String(reason), csrf });
-    if (content) body.set('content', content);
-    return this.client.checkedRequest<BiliApiResponse<null>>('https://api.bilibili.com/x/v2/reply/report', {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString(),
-    });
+  /**
+   * 举报
+   * @param rpid - 评论 ID，{@link ReplyEntry.rpid}
+   * @param reason - 举报原因
+   * @param content - 补充说明
+   */
+  async report(
+    rpid: number,
+    reason: ReplyReportReason = ReplyReportReason.SPAM,
+    content?: string,
+  ): Promise<BiliApiResponse<null>> {
+    return this.client.comment.report(this.oid, rpid, reason, this.replyType, content);
   }
 
   /** 评论总数 */
   async count(): Promise<BiliApiResponse<{ count: number }>> {
-    return this.client.request(
-      `https://api.bilibili.com/x/v2/reply/count?type=${this.replyType}&oid=${this.oid}`,
-    );
+    return this.client.comment.replyCount(this.oid, this.replyType);
   }
 
   private csrf(): string {
@@ -151,16 +157,5 @@ export class CommentArea {
     const m = c.match(/(?:^|;\s*)bili_jct=([^;]+)/);
     if (!m) throw new Error('缺少 CSRF Token（bili_jct），请先登录');
     return m[1];
-  }
-
-  private async action(url: string, rpid: number, action: number): Promise<BiliApiResponse<null>> {
-    const csrf = this.csrf();
-    return this.client.checkedRequest<BiliApiResponse<null>>(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        type: String(this.replyType), oid: String(this.oid), rpid: String(rpid), action: String(action), csrf,
-      }).toString(),
-    });
   }
 }

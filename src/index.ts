@@ -46,8 +46,8 @@ export { ReplyFeedItem, AtFeedItem } from './api/notify-results.js';
 
 // Comment API
 export { CommentAPI } from './api/comment.js';
+export type { ReplyPage } from './api/comment.js';
 export { CommentArea } from './api/comment-area.js';
-export type { ReplyPage } from './api/comment-area.js';
 export {
   ReplyType,
   ReplySort,
@@ -95,6 +95,8 @@ export type {
 
 export { UploadAPI } from './api/upload.js';
 export type { UploadImageResult } from './api/upload.js';
+
+export type { DynamicDetail } from './api/dynamic-types.js';
 
 export { ChatAPI } from './api/chat.js';
 export {

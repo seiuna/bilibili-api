@@ -166,7 +166,7 @@ console.log('登录成功！');
 | API | 入口 | 功能 |
 |---|---|---|
 | 视频 | `client.video(bvid).fetch()` | 获取视频详情、数据统计 |
-| 评论 | `client.comment` / `new CommentArea()` | 评论翻页、发评、点赞、举报、置顶、删除 |
+| 评论 | `client.comment` / `new CommentArea(client, oid, type)` | 评论翻页、发评、点赞、举报、置顶、删除 |
 | 用户 | `video.getUser()` / `UserQuery` | 用户卡片、等级、VIP 信息 |
 | 通知 | `client.notify` | 未读计数、"回复我的"、"@我的" 翻页 |
 | 私信 | `client.chat` | 会话列表、详情、免打扰、拦截、标记已读 |

@@ -1,16 +1,20 @@
 import { ConfigManager } from './config.js';
 import { VideoQuery } from './queries/video.js';
+import type { VideoInfo } from './queries/video.js';
+import { VideoResult } from './queries/results.js';
 import { loginByWebQrcode, loginByTvQrcode } from './qrcode.js';
 import type {
   WebQrcodeLoginOptions,
   TvQrcodeLoginOptions,
   QrcodeLoginResult,
 } from './qrcode.js';
+import type { BiliApiResponse } from './types.js';
 import { NotifyAPI } from './api/notify.js';
 import { CommentAPI } from './api/comment.js';
 import { ChatAPI } from './api/chat.js';
 import { SpaceAPI } from './api/space.js';
 import { UploadAPI } from './api/upload.js';
+import type { DynamicDetail } from './api/dynamic-types.js';
 
 // ==========================================
 // BiliClient — 全局客户端 & 拦截器
@@ -78,6 +82,29 @@ export class BiliClient {
 
   video(bvid: string): VideoQuery {
     return new VideoQuery(this, { vid: bvid });
+  }
+
+  /**
+   * 通过 aid 获取视频详情
+   * @param aid - 视频 AV 号
+   * @returns {@link VideoResult}
+   */
+  async videoByAid(aid: number): Promise<VideoResult> {
+    const raw = await this.request<BiliApiResponse<VideoInfo>>(
+      `https://api.bilibili.com/x/web-interface/view?aid=${aid}`,
+    );
+    return new VideoResult(this, raw);
+  }
+
+  /**
+   * 通过动态 ID 获取动态详情
+   * @param dynamicId - 动态 ID
+   * @returns {@link DynamicDetail}
+   */
+  async dynamicDetail(dynamicId: number): Promise<BiliApiResponse<DynamicDetail>> {
+    return this.request<BiliApiResponse<DynamicDetail>>(
+      `https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${dynamicId}`,
+    );
   }
 
   private _notify: NotifyAPI | null = null;
