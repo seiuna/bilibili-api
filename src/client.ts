@@ -99,7 +99,7 @@ export class BiliClient {
   /**
    * 通过动态 ID 获取动态详情
    * @param dynamicId - 动态 ID
-   * @returns {@link DynamicDetail}
+   * @returns BiliApiResponse<DynamicDetail>
    */
   async dynamicDetail(dynamicId: number): Promise<BiliApiResponse<DynamicDetail>> {
     return this.request<BiliApiResponse<DynamicDetail>>(
