@@ -6,7 +6,7 @@
 - `npm run dev` — build 的 watch 模式。
 - `npm run demo` — 运行 `scripts/auto-reply.ts`，会**登录真实账号并自动发评论**。只在明确想跑 demo 时使用。
 - `npm test` — vitest，运行 `src/*.test.ts`。无需登录的测试默认会跑；需要登录的测试在 `bili-config.json` 有效时才会执行。写操作测试默认跳过，需 `ENABLE_WRITE_TESTS=1 npm test` 才会执行。
-- `npx tsx test.ts` — 根目录下的完整集成测试脚本（读操作），会登录并走一遍视频/评论/用户空间/通知等接口。
+- `npx vitest run src/all-features.test.ts` — 完整集成测试（读操作），会走一遍视频/评论/用户空间/通知等接口。
 - `npx tsc --noEmit` — 类型检查。
 
 ## 入口与脚本
