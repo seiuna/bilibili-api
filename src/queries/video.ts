@@ -1,6 +1,5 @@
 import type { BiliClient } from '../client.js';
 import type { RequestContext, BiliApiResponse } from '../types.js';
-import { CommentQuery } from './comment.js';
 import { VideoResult } from './results.js';
 
 // ==========================================
@@ -84,13 +83,6 @@ export class VideoQuery {
     private client: BiliClient,
     private ctx: RequestContext,
   ) {}
-
-  getComment(): CommentQuery {
-    return new CommentQuery(this.client, {
-      ...this.ctx,
-      oid: this.ctx.vid ? undefined : this.ctx.oid,
-    });
-  }
 
   async fetch(): Promise<VideoResult> {
     const vid = this.ctx.vid;

@@ -104,9 +104,9 @@ export class UserQuery {
    * 此处自动提取 data.card 进行二次封装。
    */
   async fetch(): Promise<UserResult> {
-    const mid = this.ctx.mid ?? this.ctx.vid;
+    const mid = this.ctx.mid;
     if (!mid) {
-      throw new Error('UserQuery.fetch(): 缺少 mid 或 vid');
+      throw new Error('UserQuery.fetch(): 缺少 mid');
     }
     const raw = await this.client.request<
       BiliApiResponse<{ card: UserCard }>
