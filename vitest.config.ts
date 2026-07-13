@@ -10,6 +10,6 @@ export default defineConfig({
     exclude: ['node_modules', 'dist'],
     reporters: ['verbose'],
     silent: false,
-    passWithNoTests: true,
+    passWithNoTests: false,
   },
 });
