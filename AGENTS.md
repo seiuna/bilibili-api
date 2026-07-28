@@ -32,7 +32,7 @@
 
 ## 发布
 
-- `.github/workflows/publish-package.yml`：在 GitHub Release 发布时触发，`npm ci → npm run build → npm publish`，发布到 GitHub Packages（`@seiuna` scope）。
+- `.github/workflows/publish-package.yml`：在 GitHub Release 发布时触发，`npm ci → npm run build → npm publish --access public`，发布到 npm（`@seiuna` scope）。
 - `.github/release-drafter.yml` + workflow：向 `main` 分支 push 时自动更新 Release Draft。
 
 ## TypeScript / 构建
