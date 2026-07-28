@@ -70,31 +70,7 @@ pnpm add @seiuna/bilibili-api
 
 
 
-### 从 GitHub Packages 安装
 
-
-
-
-
-```bash
-
-echo "@seiuna:registry=https://npm.pkg.github.com" >> .npmrc
-
-```
-
-
-
-
-
-```bash
-
-npm login --registry=https://npm.pkg.github.com
-
-# Username: 你的 GitHub 用户名
-
-# Password: 你的 GitHub Personal Access Token（需要 read:packages 权限）
-
-```
 
 
 
