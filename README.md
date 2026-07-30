@@ -1,887 +1,610 @@
-# bilibili-api
-
-
+# @seiuna/bilibili-api
 
 <div align="center">
 
-
-
-**类型安全的 Bilibili API 客户端 — 扫码登录、评论区、私信、用户空间、图片上传，支持自动凭证刷新与 Generator 分页**
-
-
-
-*支持扫码登录、评论区操作、私信、动态、用户空间、图片上传... 你需要的都有*
-
-
+**类型安全的 Bilibili API 客户端**
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue?logo=typescript)](https://www.typescriptlang.org/)
-
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green?logo=node.js)](https://nodejs.org/)
-
 [![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
-
-
 
 </div>
 
-
-
----
-
-
-
-## 功能
-
-
-
-- **二维码登录** — Web 端 & TV 端两种登录方式，终端里直接扫码，也支持 base64 图片
-
-- **自动续期** — Cookie 失效时自动用 `refresh_token` 刷新
-
-- **Async Generator 翻页** — 评论区、通知、私信全部用 `for await...of` 遍历，不用手动处理分页逻辑
-
-- **链式查询** — 视频 → 评论区 → 用户，关联数据一键串联查询
-
-- **轻量** — 只依赖 `qrcode`（生成二维码）和 `zod`（可选校验）
-
-
-
----
-
-
-
 ## 安装
 
-
-
 ```bash
-
 npm install @seiuna/bilibili-api
-
 # 或
-
-yarn add @seiuna/bilibili-api
-
-# 或
-
 pnpm add @seiuna/bilibili-api
-
 ```
 
-
-
-
-
-
-
 ---
-
-
 
 ## 快速开始
 
-
-
 ```ts
-
 import { BiliClient } from '@seiuna/bilibili-api';
 
-
-
-// 1. 创建客户端（配置自动持久化到 bili-config.json）
-
+// 创建客户端（未认证，仅可调用公开 API）
 const client = await BiliClient.create();
 
+// 获取视频（无需登录）
+const video = await client.getVideo('BV1GJ411x7h7');
+console.log(video.title, video.stat.view, video.owner.name);
 
-
-// 2. 扫码登录（终端会打印二维码）
-
-const login = await client.ensureLogin({
-
-  onStatusChange: (status, msg, _, qrcodeTerminal) => {
-
-    console.log(`[${status}] ${msg}`);
-
-    if (qrcodeTerminal) console.log(qrcodeTerminal);
-
-  },
-
-});
-
-
-
-if (!login.success) {
-
-  console.error('登录失败:', login.message);
-
-  process.exit(1);
-
+// 获取评论区
+const area = video.commentArea();
+for await (const page of area.list()) {
+  for (const c of page.comments) {
+    console.log(`${c.member.uname}: ${c.content.message}`);
+  }
+  break;
 }
-
-
-
-console.log('登录成功！');
-
-
-
 ```
 
-> 扫码一次后，cookie 会存到本地文件，下次启动自动复用，不用重复扫码。
+### 登录后使用需要认证的 API
 
+```ts
+const authed = await client.ensureLogin({             // ← 返回 BiliClient<HasToken>
+  onStatusChange: (status, msg, _, qrcodeTerminal) => {
+    console.log(`[${status}] ${msg}`);
+    if (qrcodeTerminal) console.log(qrcodeTerminal);
+  },
+});
+
+// 现在可以调用需要登录的方法
+const toView = await authed.history.getToViewList();  // ✅
+const unread = await authed.message.unreadCount();     // ✅
+
+// 退出登录后降级为未认证
+const anon = await authed.logout();                    // BiliClient<void>
+// anon.history.getToViewList();                       // ❌ 编译错误
+```
 
 ---
 
+## 架构
 
+```
+src/
+├── core/                  # 核心层
+│   ├── client.ts          # BiliClient<T> — 统一入口
+│   ├── config.ts          # ConfigManager — 凭证持久化
+│   ├── auth.ts            # 登录模块（二维码/密码/短信）
+│   ├── sign.ts            # APP 签名 + WBI 签名
+│   └── types.ts           # 全局公共类型
+├── api/                   # API 层
+│   ├── video.ts           # VideoAPI
+│   ├── user.ts            # UserAPI
+│   ├── comment.ts         # CommentAPI
+│   ├── message.ts         # MessageAPI
+│   ├── dynamic.ts         # DynamicAPI
+│   ├── article.ts         # ArticleAPI
+│   ├── search.ts          # SearchAPI
+│   ├── history.ts         # HistoryAPI
+│   ├── favorite.ts        # FavoriteAPI
+│   ├── danmaku.ts         # DanmakuAPI
+│   ├── emoji.ts           # EmojiAPI
+│   ├── note.ts            # NoteAPI
+│   ├── electric.ts        # ElectricAPI
+│   ├── ranking.ts         # RankingAPI
+│   ├── live.ts            # LiveAPI
+│   ├── upload.ts          # UploadAPI
+│   ├── opus.ts            # OpusAPI
+│   └── common.ts          # 公共工具（av/bv转换、图片格式化等）
+└── entities/              # Entity
+    ├── Video.ts           # Video — 视频
+    ├── User.ts            # User — 用户
+    ├── Comment.ts         # Comment — 单条评论
+    ├── CommentArea.ts     # CommentArea — 评论区绑定
+    ├── Article.ts         # Article — 专栏
+    ├── Dynamic.ts         # Dynamic — 动态
+    ├── Opus.ts            # Opus — 图文
+    ├── LiveRoom.ts        # LiveRoom — 直播间
+    ├── FavoriteFolder.ts  # FavoriteFolder — 收藏夹
+    ├── NotifyItem.ts      # ReplyNotifyItem / AtNotifyItem
+    └── BaseEntity.ts      # 基类
+```
+
+---
 
 ## API 总览
 
+### 门面方法（Facade）— 通过 `BiliClient` 实例调用
 
+| 方法 | 返回 | 说明 | 需登录 |
+| ------ | ------ | ------ | -------- |
+| `getVideo(bvid)` | `Video` | 获取视频 | 否 |
+| `getVideoByAid(aid)` | `Video` | 通过 avid 获取视频 | 否 |
+| `getUser(mid)` | `User` | 获取用户 | 否 |
+| `getArticle(cvid)` | `Article` | 获取专栏 | 否 |
+| `getDynamic(id)` | `Dynamic` | 获取动态 | 否 |
+| `getOpus(id)` | `Opus` | 获取图文 | 否 |
+| `getLiveRoom(roomId)` | `LiveRoom` | 获取直播间 | 否 |
+| `getFavoriteFolder(mediaId)` | `FavoriteFolder` | 获取收藏夹 | 否 |
+| `getHistory()` | AsyncGenerator | 翻页获取历史记录 | **是** |
+| `getToViewList()` | `ToViewVideo[]` | 稍后再看列表 | **是** |
 
+### 子 API — 通过 `client.video` / `client.user` / `client.comment` 等访问
 
+所有子 API 以**静态类**方式提供，也可独立导入使用：
 
-| API | 入口 | 功能 |
-|---|---|---|
-| 视频 | `client.video(bvid).fetch()` | 获取视频详情、数据统计 |
-| 评论 | `client.comment` / `new CommentArea(client, oid, type)` | 评论翻页、发评、点赞、举报、置顶、删除 |
-| 用户 | `video.getUser()` / `UserQuery` | 用户卡片、等级、VIP 信息 |
-| 通知 | `client.notify` | 未读计数、"回复我的"、"@我的" 翻页 |
-| 私信 | `client.chat` | 会话列表、详情、免打扰、拦截、标记已读 |
-| 空间 | `client.space` | 置顶视频、代表作、TAG、公告、隐私、头图 |
-| 上传 | `client.upload` | 上传图片到 B 站（文件/base64/URL） |
+```ts
+import { VideoAPI } from '@seiuna/bilibili-api';
 
+const info = await VideoAPI.getInfo(client, 'BV1GJ411x7h7');
+```
 
+| 子 API | 入口 | 需登录 getter | 需登录 setter |
+| -------- | ------------ | -------------- | -------------- |
+| 视频 | `client.video` | 否 | 是 |
+| 用户 | `client.user` | 否 | 是 |
+| 评论 | `client.comment` | 否 | 是 |
+| 搜索 | `client.search` | 否 | — |
+| 排行 | `client.ranking` | 否 | — |
+| 表情 | `client.emoji` | 否 | — |
+| 弹幕 | `client.danmaku` | 否 | 是 |
+| 动态 | `client.dynamic` | 否 | 是 |
+| 专栏 | `client.article` | 否 | 是 |
+| 图文 | `client.opus` | 否 | — |
+| 直播 | `client.live` | 否 | 是 |
+| 收藏夹 | `client.favorite` | 否 | 是 |
+| 消息 | `client.message` | **是** | — |
+| 历史 | `client.history` | **是** | — |
+| 笔记 | `client.note` | **是** | — |
+| 充电 | `client.electric` | **是** | — |
+| 上传 | `client.upload` | **是** | — |
 
 ---
-
-
 
 ## 登录
 
-
-
 ### Web 端扫码（推荐）
 
-
-
 ```ts
+import { QrcodeStatus } from '@seiuna/bilibili-api';
 
-const result = await client.loginByQrcode({
-
-  pollInterval: 2000,       // 轮询间隔（毫秒）
-
+const authed = await client.loginByQrcode({
+  pollInterval: 2000,       // 轮询间隔
   timeout: 180_000,         // 超时（3分钟）
-
   onStatusChange: (status, msg, base64, terminal) => {
-
-    // status: NOT_SCANNED → NOT_CONFIRMED → SUCCESS
-
-    // base64: data:image/png;base64,
-
-    // terminal: ANSI 终端二维码字符
-
-    if (status === QrcodeStatus.NOT_SCANNED && terminal) {
-
-      console.log(terminal);
-
+    if (status === QrcodeStatus.NOT_SCANNED) {
+      if (terminal) console.log(terminal);
     }
-
   },
-
 });
-
+// authed: BiliClient<HasToken>
 ```
 
-
-
-### TV 端扫码（云视听小电视）
-
-
+### 自动登录（推荐）
 
 ```ts
-
-const result = await client.loginByTvQrcode({
-
-  pollInterval: 2000,
-
-  timeout: 180_000,
-
-  onStatusChange: (status, msg) => console.log(msg),
-
-  appKeyPair: KNOWN_APPKEYS.tv,  // 可换其他 APPKEY
-
-});
-
-```
-
-
-
-### 自动登录
-
-
-
-`ensureLogin()`
-
-
-
-```ts
-
-const result = await client.ensureLogin({
-
+const authed = await client.ensureLogin({
   onStatusChange: (status, msg, _, terminal) => {
-
     console.log(`[${status}] ${msg}`);
-
     if (terminal) console.log(terminal);
-
   },
-
 });
-
-
-
-// 1. cookie 有效 → 直接返回
-
-// 2. cookie 过期但有 refresh_token → 刷新
-
-// 3. 都没有 → 弹出二维码
-
+// 优先序：已有 cookie → refresh_token 刷新 → 弹出二维码
 ```
 
-
-
-### 检查登录状态
-
-
+### 密码登录
 
 ```ts
-
-const { loggedIn, mid } = await client.isLoggedIn();
-
+const authed = await client.loginByPassword('username', 'password');
 ```
 
+### 退出登录
 
+```ts
+const anon = await authed.logout();   // BiliClient<void>
+```
 
 ---
 
-
-
-## 视频查询
-
-
+## 视频
 
 ```ts
+// 门面方法（推荐）
+const video = await client.getVideo('BV1GJ411x7h7');
+console.log(video.title);
+console.log(`播放: ${video.stat.view}  点赞: ${video.stat.like}`);
 
-const video = await client.video('BV1xx411c7mD').fetch();
+// 视频流地址
+const playUrl = await video.getPlayUrl({ qn: 80, fnval: 16 });
+console.log(playUrl.data.dash?.video[0]?.baseUrl);
 
+// AI 摘要
+const summary = await video.getAiSummary();
 
+// 高能进度条
+const pbp = await video.getPbp();
 
-console.log(video.title);       // 视频标题
+// 视频 TAG
+const tags = await video.getTags();
 
-console.log(video.owner.name);  // UP 主名字
+// 推荐视频
+const related = await video.getRecommend();
 
-console.log(video.stat.view);   // 播放量
-
-console.log(video.stat.like);   // 点赞数
-
-console.log(video.desc);        // 视频简介
-
+// 互动操作
+await video.like();
+await video.coin(2, true);      // 投 2 币 + 同时点赞
+await video.triple();           // 一键三连
 ```
-
-
-
-`VideoResult` 还串联了评论和用户查询：
-
-
-
-```ts
-
-const video = await client.video('BV1xx411c7mD').fetch();
-
-
-
-// 获取 UP 主信息
-
-const up = await video.getUser();
-
-console.log(up.name, up.fans, up.level_info.current_level);
-
-
-
-// 获取视频评论区
-
-const area = video.commentArea();
-
-for await (const { comments } of area.list()) {
-
-  comments.forEach(c => console.log(`${c.member.uname}: ${c.content.message}`));
-
-}
-
-```
-
-
 
 ---
-
-
 
 ## 评论
 
-
-
-### 评论区翻页
-
-
+### 评论区分页
 
 ```ts
+import { ReplySort, CommentArea } from '@seiuna/bilibili-api';
 
-import { CommentArea, ReplySort } from '@seiuna/bilibili-api';
-
-
-
-const area = new CommentArea(client, 398870552, 11); // oid=动态ID, type=11(动态)
-
-// 也可用 video.commentArea() 或 comment.commentArea() 自动创建
-
-
+const area = new CommentArea(authed, oid, type);
+// 或快捷访问: video.commentArea()
 
 for await (const page of area.list(ReplySort.TIME)) {
-
-  console.log(`--- 第 ${page.page} 页 ---`);
-
   for (const comment of page.comments) {
-
-    console.log(`#${comment.rpid} ${comment.member.uname}: ${comment.content.message.slice(0, 50)}`);
-
+    console.log(`${comment.member.uname}: ${comment.content.message}`);
   }
-
-  if (page.hots) {
-
-    console.log(`热评 ${page.hots.length} 条`);
-
-  }
-
+  // page.hots — 热评
 }
-
 ```
 
-
-
-### 发表评论 / 回复
-
-
+### 发表 / 回复 / 带图
 
 ```ts
-
 // 一级评论
-
-const result = await area.add('这是评论内容');
-
-console.log('评论成功, rpid:', result.data.rpid);
-
-
+const { data } = await area.add('评论内容');
+console.log(`rpid=${data.rpid}`);
 
 // 回复某条评论
+await area.add('回复内容', rootRpid, parentRpid);
 
-const img = await client.upload.image('./cute-cat.png');
-
-await area.add('好可爱的猫猫！', rootRpid, parentRpid, [img]);
-
+// 上传图片后发表带图评论
+const img = await authed.upload.image('./cat.png');
+await area.add('带图评论', 0, 0, [img.data]);
 ```
 
-
-
-### 点赞 / 点踩 / 置顶 / 举报 / 删除
-
-
-
-
+### 点赞 / 点踩 / 删除 / 举报 / 置顶
 
 ```ts
-
-for await (const { comments } of area.list()) {
-
-  for (const comment of comments) {
-
-    await comment.like();            // 点赞
-
-    await comment.hate();            // 点踩
-
-    await comment.top();             // 置顶
-
-    await comment.delete();          // 删除
-
-    await comment.report(ReplyReportReason.SPAM, '这是垃圾广告');
-
-
-
-    // 快捷回复
-
-    await comment.reply('喵~');
-
-  }
-
-}
-
+const c = new Comment(authed, replyEntry, oid);
+await c.like();
+await c.hate();
+await c.reply('回复');
+await c.delete();
+await c.report(ReplyReportReason.SPAM);
+await c.top(true);
 ```
 
-
-
-### 懒加载排序（ReplyMode）
-
-
+### CommentAPI 直接调用
 
 ```ts
+import { CommentAPI } from '@seiuna/bilibili-api';
 
-const api = client.comment;
+// 评论总数
+const { data } = await CommentAPI.replyCount(authed, aid, 1);
 
-for await (const { cursor, comments } of api.repliesWbi(oid, 1, ReplyMode.HEAT)) {
+// 翻页查询
+for await (const page of CommentAPI.replies(authed, aid, 1, ReplySort.TIME)) { }
 
-  console.log(`cursor=${cursor}, ${comments.length} 条`);
+// 懒加载翻页
+for await (const { cursor, comments } of CommentAPI.repliesWbi(authed, aid, 1)) { }
 
-}
-
+// 热评
+for await (const page of CommentAPI.hotReplies(authed, aid, 1)) { }
 ```
-
-
 
 ---
 
-
-
-## 通知中心
-
-
+## 用户
 
 ```ts
+const user = await client.getUser(mid);
+console.log(user.name, user.level, user.sign);
 
-const notify = client.notify;
+const stat = await user.getStat();      // following/follower
+const upStat = await user.getUpStat();  // archive.view/likes
 
+const medals = await user.getMedalWall();
 
+await user.follow();
+await user.unfollow();
+await user.block();
+```
+
+### UserAPI
+
+```ts
+import { UserAPI } from '@seiuna/bilibili-api';
+
+const info = await UserAPI.getInfo(authed, mid);
+const stat = await UserAPI.getRelationStat(authed, vmid);
+const log  = await UserAPI.getLoginLog(authed);
+const uid  = await UserAPI.nameToUid(authed, 'bilibili');
+```
+
+---
+
+## 消息与私信
+
+```ts
+const msg = authed.message;
 
 // 未读计数
-
-const unread = await notify.unreadCount();
-
-console.log(`回复:${unread.data.recv_reply}  @我:${unread.data.at}  私信:${unread.data.chat}`);
-
-
+const unread = await msg.unreadCount();
+console.log(`回复:${unread.data.reply}  @:${unread.data.at}`);
 
 // "回复我的" 翻页
-
-for await (const item of notify.replyFeed()) {
-
-  console.log(`${item.authorName()} 回复了: ${item.content()}`);
-
-  // item.commentArea() 进入对应评论区
-
+for await (const item of msg.replyFeed()) {
+  console.log(`${item.user.nickname}: ${item.item.source_content}`);
 }
-
-
 
 // "@我的" 翻页
+for await (const item of msg.atFeed()) { }
 
-for await (const item of notify.atFeed()) {
+// 会话列表
+for await (const { sessions } of msg.sessions()) { }
 
-  console.log(`${item.authorName()} @了你: ${item.content()}`);
+// 消息中心设置
+const settings = await msg.getSettings();
+```
 
-  for (const detail of item.atDetails()) {
+### 自动处理 @ 和 回复
 
-    console.log(`  提到: ${detail.nickname} (mid=${detail.mid})`);
+```ts
+const client = await BiliClient.create();
 
+const authedClient = await client.ensureLogin({
+  onStatusChange: (status, msg, _qrcodeBase64, qrcodeTerminal) => {
+    console.log(`[${status}] ${msg}`);
+    if (qrcodeTerminal) console.log(qrcodeTerminal);
+  },
+});
+
+const interval = setInterval(async () => {
+  const count = await MessageAPI.unreadCount(authedClient);
+  if (count.data.at) {
+    let atCount = count.data.at;
+    for await (const rawItem of MessageAPI.atFeed(authedClient)) {
+      if (atCount-- <= 0) break;
+      const atItem = new AtNotifyItem(authedClient, rawItem);
+      console.log(`#${atItem.sourceId} [${atItem.businessId}]: ${atItem.content}`);
+      await atItem.reply(atItem.content);
+    }
+    console.log('未读消息数:', count.data.at);
   }
-
-}
-
-```
-
-
-
----
-
-
-
-## 私信（Chat）
-
-
-
-```ts
-
-const chat = client.chat;
-
-
-
-// 获取会话列表
-
-for await (const { sessions } of chat.sessions(SessionQueryType.ALL)) {
-
-  for (const s of sessions) {
-
-    console.log(`${s.talker_id} 未读:${s.unread_count} 最新:${s.last_msg?.content}`);
-
-  }
-
-}
-
-
-
-// 标记已读
-
-await chat.markRead(talkerId);
-
-
-
-// 获取新会话（增量拉取）
-
-for await (const { sessions } of chat.newSessions(lastTs)) {
-
-  // 处理新会话...
-
-}
-
-
-
-// 免打扰 / 拦截 / 置顶
-
-await chat.setDnd(ownUid, DndSetting.ON, targetUid);
-
-await chat.setIntercept(talkerId, InterceptStatus.ON);
-
-await chat.setTop(talkerId, SessionType.USER, TopOpType.TOP);
-
-
-
-// 删除会话 / 清空垃圾箱
-
-await chat.removeSession(talkerId);
-
-await chat.batchRemoveDustbin();
+}, 10000);
 
 ```
 
-
-
 ---
 
-
-
-## 用户空间
-
-
+## 搜索
 
 ```ts
+const search = client.search;
 
-const space = client.space;
+// 综合搜索
+const result = await search.searchAll(authed, 'meow');
 
+// 热搜
+const hot = await search.getHotSearch(authed, 10);
 
-
-// 置顶视频
-
-const topArc = await space.topArc(mid);
-
-await space.setTopArc('BV1xx411c7mD', '这个视频真的很棒');
-
-await space.cancelTopArc();
-
-
-
-// 代表作
-
-const masterpieces = await space.masterpieces(mid);
-
-await space.addMasterpiece('BV1xx411c7mD');
-
-
-
-// 个人 TAG
-
-const tags = await space.tags(mid);
-
-await space.setTags('Vue,TypeScript,前端');
-
-
-
-// 空间公告
-
-const notice = await space.notice(mid);
-
-await space.setNotice('欢迎来到我的空间~');
-
-
-
-// 空间设置
-
-const settings = await space.getSettings(mid);
-
-await space.setPrivacy({ fav_video: 0, tags: 1 });
-
-await space.setToutu(photoId);
-
-
-
-// 最近玩过的游戏
-
-const games = await space.lastPlayGames(mid);
-
-
-
-// 最近投币视频
-
-const videos = await space.coinVideos(mid);
-
+// 搜索建议
+const suggest = await search.getSuggest(authed, 'bilibili');
 ```
 
+---
 
+## 历史记录与稍后再看
+
+```ts
+const history = authed.history;   // 需登录
+
+// 翻页获取历史
+for await (const item of history.history(authed, 30)) {
+  console.log(item.title, item.progress);
+}
+
+// 稍后再看
+const list = await history.getToViewList(authed);
+await history.addToView(authed, aid);
+await history.removeFromView(authed, aid);
+```
 
 ---
 
-
-
-## 图片上传
-
-
+## 收藏夹
 
 ```ts
+const fav = client.favorite;
 
-const upload = client.upload;
+// 获取收藏夹列表
+const folders = await fav.getCreatedFolders(authed, mid);
+if (folders.data.list?.length) {
+  const folder = folders.data.list[0];
 
+  // 获取内容
+  const contents = await fav.getFolderList(authed, folder.id);
+}
+```
 
+---
 
-// 上传本地文件
+## 弹幕
 
-const result = await upload.image('./cute-cat.png');
+```ts
+const dm = client.danmaku;
 
-console.log(result.data.image_url);
+// 历史弹幕日期索引
+const dates = await dm.getHistoryDates(authed, cid, '2025-07');
 
+// 发送弹幕
+await dm.postDanmaku(authed, oid, '弹幕内容', { aid, progress: 10000 });
+```
 
+---
+
+## 表情
+
+```ts
+const emoji = client.emoji;
+
+const panel = await emoji.getPanel(authed);
+// panel.data.packages[].emote[] — 每个表情包内的表情列表
+```
+
+---
+
+## 笔记
+
+```ts
+const note = authed.note;   // 需登录
+
+// 检查视频是否禁止笔记
+const { data } = await note.isForbid(authed, aid);
+
+// 获取用户笔记列表
+const list = await note.getUserNotes(authed);
+```
+
+---
+
+## 动态
+
+```ts
+const dyn = client.dynamic;
+
+// 空间动态
+const feed = await dyn.getSpace(authed, mid);
+
+// 动态操作
+await dyn.like(authed, dynIdStr);
+await dyn.delete(authed, dynamicId);
+await dyn.setTop(authed, dynStr);
+```
+
+---
+
+## 专栏与图文
+
+```ts
+// 专栏
+const article = await client.getArticle(cvid);
+console.log(article.title);
+
+// 图文
+const opus = await client.getOpus('1216412988246851587');
+const opusArea = opus.commentArea();
+```
+
+---
+
+## 排行与热门
+
+```ts
+const rank = client.ranking;
+
+// 热门视频
+const popular = await rank.getPopular(authed);
+
+// 排行榜
+const ranking = await rank.getRanking(authed);
+
+// 入站必刷
+const precious = await rank.getPreciousVideos(authed);
+```
+
+---
+
+## 直播
+
+```ts
+const live = client.live;
+
+const room = await live.getRoomInfo(authed, roomId);
+console.log(`标题: ${room.data.title}  在线: ${room.data.online}`);
+```
+
+---
+
+## 充电
+
+```ts
+const elec = authed.electric;   
+
+const list = await elec.getMonthlyChargeList(authed, mid);
+const show = await elec.getVideoChargeShow(authed, mid, aid);
+```
+
+---
+
+## 上传
+
+```ts
+const upload = authed.upload;  
+
+// 上传本地图片
+const img = await upload.image(authed, './image.png');
 
 // 上传 base64
-
-const base64 = 'data:image/png;base64,iVBORw0KGgo...';
-
-const result2 = await upload.uploadFromBase64(base64);
-
-
+const b64 = await upload.uploadFromBase64(authed, base64Str);
 
 // 从 URL 下载后上传
-
-const result3 = await upload.uploadFromUrl('https://example.com/pic.jpg');
-
+const url = await upload.uploadFromUrl(authed, 'https://example.com/pic.jpg');
 ```
-
-
-
-上传结果可直接传给评论区发表方法：
-
-
-
-```ts
-
-const img = await client.upload.image('./meme.png');
-
-await area.add('配图评论', 0, 0, [img]);
-
-```
-
-
 
 ---
 
-
-
-## 链式查询
-
-
+## 公共工具
 
 ```ts
+import { av2bv, bv2av, formatImageUrl } from '@seiuna/bilibili-api';
 
-// 从视频出发
+av2bv(170001);                 // "BV1xx411c7mD"
+bv2av('BV1xx411c7mD');         // 170001
 
-const video = await client.video('BV1xx411c7mD').fetch();
+// 图片 CDN 参数格式化
+formatImageUrl(url, { width: 200, height: 200, format: 'webp' });
 
-
-
-// 获取 UP 主信息
-
-const up = await video.getUser();
-
-
-
-// 获取评论
-
-const comments = await video.getComment().fetch();
-
-
-
-// 从评论出发 → 获取评论者
-
-const commentQuery = video.getComment();
-
-const user = await commentQuery.getUser().fetch();
-
-```
-
-
-
----
-
-
-
-## 进阶用法
-
-
-
-### 自定义配置路径
-
-
-
-```ts
-
-const client = await BiliClient.create('./my-bili-config.json');
-
-```
-
-
-
-### 直接发包（绕过拦截器）
-
-
-
-```ts
-
-// 普通发包（自动附加 Cookie、自动刷新凭证）
-
-const data = await client.request<ResponseType>(url, options);
-
-
-
-// 发包 + 自动检查 code（非 0 抛 BiliApiError）
-
-const data = await client.checkedRequest<ResponseType>(url, options);
-
-```
-
-
-
-### Token 签名
-
-
-
-如果你需要对接需要签名的 B 站接口：
-
-
-
-```ts
-
+// APP 签名
 import { signParams, buildSignedQuery, KNOWN_APPKEYS } from '@seiuna/bilibili-api';
+const query = buildSignedQuery({ foo: 1 }, KNOWN_APPKEYS.tv.appkey, KNOWN_APPKEYS.tv.appsec);
 
-
-
-const query = buildSignedQuery(
-
-  { local_id: 0, ts: Math.floor(Date.now() / 1000) },
-
-  KNOWN_APPKEYS.tv.appkey,
-
-  KNOWN_APPKEYS.tv.appsec,
-
-);
-
-// → "appkey=4409e2ce...&local_id=0&sign=abc123...&ts=1234567890"
-
+// WBI 签名
+import { wbiSign, buildWbiSignedQuery } from '@seiuna/bilibili-api';
+const signed = wbiSign({ id: 123 }, imgKey, subKey);
 ```
-
-
 
 ---
 
+## 凭证持久化
 
-
-## 🧪 开发
-
-
-
-```bash
-
-cd packages/bilibili-api
-
-
-
-# 构建
-
-pnpm build          # tsup → dist/
-
-
-
-# 开发模式（watch）
-
-pnpm dev
-
-
-
-# 测试
-
-pnpm test           # vitest run
-
-pnpm test:watch     # vitest watch
-
-```
-
-
-
-
-
-## 配置持久化
-
-
-
-登录后配置自动保存到 `bili-config.json`（可通过 `BiliClient.create(path)` 自定义路径）：
-
-
+登录后凭证自动保存到 `bili-config.json`（可通过 `BiliClient.create(path)` 自定义路径）：
 
 ```json
-
 {
-
   "cookie": "SESSDATA=xxx; bili_jct=yyy; ...",
-
   "refreshToken": "...",
-
-  "accessToken": "...",
-
-  "tvRefreshToken": "...",
-
   "mid": 123456
-
 }
-
 ```
 
-
-
 ---
-
-
 
 ## 注意事项
 
-
-
-- **不要泄露你的 cookie** — 尤其是 `bili_jct`（CSRF Token）和 `SESSDATA`，它们可以用来操控你的账号
-
-- 遵守 Bilibili 的 API 使用规范，不要高频请求
-
+- `SESSDATA` 和 `bili_jct` 可操控账号，**有泄露风险，本地存储没有加密**
+- 部分 Opus / Dynamic ID 超过 `Number.MAX_SAFE_INTEGER`，请用字符串传参
 - 登录信息存储在本地 JSON 文件中
 
-
-
+---
 
 <div align="center">
 
-
-
-Made with ❤️ for @meowbot
-
-
+Meow Meow Meow Meow Meow ~
 
 </div>

@@ -19,10 +19,6 @@
     "registry": "https://registry.npmjs.org",
     "access": "public"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/seiuna/bilibili-api.git"
-  },
   "files": [
     "dist"
   ],
@@ -50,7 +46,7 @@
     "build": "tsup index.ts --format esm --dts",
     "dev": "tsup index.ts --format esm --dts --watch",
     "demo": "tsx scripts/auto-reply.ts",
-    "run-dev": "tsx scripts/auto-reply.ts",
+    "full-test": "tsx test.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   }
