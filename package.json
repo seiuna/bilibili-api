@@ -1,20 +1,7 @@
 {
   "name": "@seiuna/bilibili-api",
-  "version": "1.0.3",
-  "description": "类型安全的 Bilibili API 客户端 — 扫码登录、评论区、私信、用户空间、图片上传，支持自动凭证刷新与 Generator 分页",
-  "keywords": [
-    "bilibili",
-    "b站",
-    "api-client",
-    "login",
-    "qrcode",
-    "comment",
-    "chat",
-    "upload",
-    "typescript"
-  ],
-  "license": "MIT",
-  "type": "module",
+  "version": "1.1.0",
+  "private": false,
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"
@@ -22,25 +9,12 @@
   "files": [
     "dist"
   ],
+  "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "dependencies": {
-    "@types/node": "^25.6.0",
-    "qrcode": "^1.5.4",
-    "zod": "^4.4.2"
-  },
-  "devDependencies": {
-    "@types/qrcode": "^1.5.6",
-    "tsup": "^8.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.0.0",
-    "vitest": "^2.1.2"
   },
   "scripts": {
     "build": "tsup index.ts --format esm --dts",
@@ -49,5 +23,16 @@
     "full-test": "tsx test.ts",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5",
+    "@types/qrcode": "^1.5.5",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.9.3",
+    "vitest": "^3.1.3"
   }
 }
