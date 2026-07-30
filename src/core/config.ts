@@ -2,16 +2,15 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { BiliConfig } from './types.js';
 
-// ==========================================
-// 持久化配置管理器
-// ==========================================
-
 const DEFAULT_CONFIG: BiliConfig = {
   cookie: '',
   refreshToken: '',
   accessToken: '',
   tvRefreshToken: '',
   mid: undefined,
+  wbiImgKey: undefined,
+  wbiSubKey: undefined,
+  wbiExpireAt: undefined,
 };
 
 export class ConfigManager {
@@ -43,12 +42,13 @@ export class ConfigManager {
     );
   }
 
-  /** 更新 Web Cookie */
+  /** 更新 Cookie */
   async updateCookie(cookie: string): Promise<void> {
     this.data.cookie = cookie;
     await this.save();
   }
 
+  /** 合并 Set-Cookie 头 */
   async mergeCookie(setCookieHeader: string): Promise<void> {
     const existing = this.parseCookiePairs(this.data.cookie);
     const incoming = this.parseCookiePairs(setCookieHeader);
@@ -61,6 +61,7 @@ export class ConfigManager {
     await this.save();
   }
 
+  /** 仅合并重要鉴权 Cookie */
   async setAuthCookies(setCookieHeader: string): Promise<void> {
     const importantKeys = [
       'DedeUserID',
@@ -106,9 +107,36 @@ export class ConfigManager {
     await this.save();
   }
 
-  private parseCookiePairs(
-    cookieStr: string,
-  ): Record<string, string> {
+  /** 更新 WBI 签名密钥 */
+  async updateWbiKeys(imgKey: string, subKey: string): Promise<void> {
+    this.data.wbiImgKey = imgKey;
+    this.data.wbiSubKey = subKey;
+    // 缓存 24 小时
+    this.data.wbiExpireAt = Date.now() + 24 * 60 * 60 * 1000;
+    await this.save();
+  }
+
+  /** 获取 WBI 密钥（若过期返回 null） */
+  getWbiKeys(): { imgKey: string; subKey: string } | null {
+    if (
+      this.data.wbiImgKey &&
+      this.data.wbiSubKey &&
+      this.data.wbiExpireAt &&
+      Date.now() < this.data.wbiExpireAt
+    ) {
+      return { imgKey: this.data.wbiImgKey, subKey: this.data.wbiSubKey };
+    }
+    return null;
+  }
+
+  /** 提取 CSRF Token (bili_jct) */
+  getCsrf(): string {
+    const match = this.data.cookie.match(/(?:^|;\s*)bili_jct=([^;]+)/);
+    if (!match) throw new Error('缺少 CSRF Token（bili_jct），请先登录');
+    return match[1];
+  }
+
+  private parseCookiePairs(cookieStr: string): Record<string, string> {
     const pairs: Record<string, string> = {};
     if (!cookieStr) return pairs;
 

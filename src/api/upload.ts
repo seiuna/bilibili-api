@@ -1,5 +1,5 @@
-import type { BiliClient } from '../client.js';
-import type { BiliApiResponse } from '../types.js';
+import { BiliClient } from '../index.js';
+import type { BiliApiResponse } from '../core/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -12,31 +12,22 @@ export interface UploadImageResult {
 }
 
 export class UploadAPI {
-  constructor(private client: BiliClient) {}
-
-  /**
-   * 上传本地图片文件
-   * @param filePath — 文件路径
-   */
-  async image(filePath: string): Promise<BiliApiResponse<UploadImageResult>> {
+  /** 上传本地图片文件 */
+  static async image(client: BiliClient<any>, filePath: string): Promise<BiliApiResponse<UploadImageResult>> {
     const buffer = await fs.readFile(filePath);
     const filename = path.basename(filePath);
-    return this.uploadBuffer(buffer, filename);
+    return UploadAPI.uploadBuffer(client, buffer, filename);
   }
 
-  /**
-   * 上传 base64 图片
-   * @param base64 — data:image/png;base64,xxxx 或纯 base64
-   * @param filename — 指定文件名（可选，默认 upload.png）
-   */
-  async uploadFromBase64(
+  /** 上传 base64 图片 */
+  static async uploadFromBase64(
+    client: BiliClient<any>,
     base64: string,
     filename?: string,
   ): Promise<BiliApiResponse<UploadImageResult>> {
     let mime = 'image/png';
     let data = base64;
 
-    // 解析 data URL: data:image/png;base64,xxxx
     const match = base64.match(/^data:(image\/\w+);base64,(.+)$/);
     if (match) {
       mime = match[1];
@@ -47,38 +38,32 @@ export class UploadAPI {
     const ext = mime.split('/')[1] || 'png';
     const name = filename ?? `upload.${ext}`;
 
-    return this.uploadBuffer(buffer, name);
+    return UploadAPI.uploadBuffer(client, buffer, name);
   }
 
-  /**
-   * 从 URL 下载图片并上传到 B 站图床
-   * @param url — 图片 URL
-   * @param filename — 指定文件名（可选，默认从 URL 提取）
-   */
-  async uploadFromUrl(
+  /** �?URL 下载图片并上�?*/
+  static async uploadFromUrl(
+    client: BiliClient<any>,
     url: string,
     filename?: string,
   ): Promise<BiliApiResponse<UploadImageResult>> {
-    const fetcher = (this.client as any).customFetch ?? fetch;
-    const res = await fetcher(url);
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`下载图片失败: HTTP ${res.status}`);
 
     const buffer = Buffer.from(await res.arrayBuffer());
     const urlPath = new URL(url).pathname;
     const name = filename ?? (path.basename(urlPath) || 'download.png');
 
-    return this.uploadBuffer(buffer, name);
+    return UploadAPI.uploadBuffer(client, buffer, name);
   }
 
-  /**
-   * 上传 Buffer 到 B 站图床（底层方法）
-   */
-  async uploadBuffer(
+  /** 上传 Buffer �?B 站图�?*/
+  static async uploadBuffer(
+    client: BiliClient<any>,
     buffer: Buffer,
     filename: string,
   ): Promise<BiliApiResponse<UploadImageResult>> {
-    const csrf = this.extractCsrf();
-    const fetcher = (this.client as any).customFetch ?? fetch;
+    const csrf = client.config.getCsrf();
 
     const boundary = `----BiliUpload${Date.now()}${Math.random().toString(36).slice(2)}`;
     const ext = path.extname(filename).toLowerCase();
@@ -90,26 +75,22 @@ export class UploadAPI {
     const parts: Buffer[] = [];
     const crlf = Buffer.from('\r\n');
 
-    // file_up 字段（二进制）
     parts.push(Buffer.from(`--${boundary}${crlf}`));
     parts.push(Buffer.from(`Content-Disposition: form-data; name="file_up"; filename="${filename}"${crlf}`));
     parts.push(Buffer.from(`Content-Type: ${mime}${crlf}${crlf}`));
     parts.push(buffer);
     parts.push(Buffer.from(crlf));
 
-    // biz 字段
     parts.push(Buffer.from(`--${boundary}${crlf}`));
     parts.push(Buffer.from(`Content-Disposition: form-data; name="biz"${crlf}${crlf}`));
     parts.push(Buffer.from('new_dyn'));
     parts.push(Buffer.from(crlf));
 
-    // category 字段
     parts.push(Buffer.from(`--${boundary}${crlf}`));
     parts.push(Buffer.from(`Content-Disposition: form-data; name="category"${crlf}${crlf}`));
     parts.push(Buffer.from('daily'));
     parts.push(Buffer.from(crlf));
 
-    // csrf 字段
     parts.push(Buffer.from(`--${boundary}${crlf}`));
     parts.push(Buffer.from(`Content-Disposition: form-data; name="csrf"${crlf}${crlf}`));
     parts.push(Buffer.from(csrf));
@@ -121,21 +102,14 @@ export class UploadAPI {
     const headers: Record<string, string> = {
       'Content-Type': `multipart/form-data; boundary=${boundary}`,
     };
-    if (this.client.config.data.cookie) {
-      headers['Cookie'] = this.client.config.data.cookie;
+    if (client.config.data.cookie) {
+      headers['Cookie'] = client.config.data.cookie;
     }
 
-    const res = await fetcher(
+    const res = await fetch(
       'https://api.bilibili.com/x/dynamic/feed/draw/upload_bfs',
       { method: 'POST', headers, body },
     );
     return res.json();
-  }
-
-  private extractCsrf(): string {
-    const c = this.client.config.data.cookie;
-    const m = c.match(/(?:^|;\s*)bili_jct=([^;]+)/);
-    if (!m) throw new Error('缺少 CSRF Token（bili_jct），请先登录');
-    return m[1];
   }
 }
