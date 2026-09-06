@@ -51,7 +51,7 @@ export class ConfigManager {
   /** 合并 Set-Cookie 头 */
   async mergeCookie(setCookieHeader: string): Promise<void> {
     const existing = this.parseCookiePairs(this.data.cookie);
-    const incoming = this.parseCookiePairs(setCookieHeader);
+    const incoming = this.parseSetCookiePairs(setCookieHeader);
 
     const merged = { ...existing, ...incoming };
     this.data.cookie = Object.entries(merged)
@@ -71,7 +71,7 @@ export class ConfigManager {
       'sid',
     ];
 
-    const allCookies = this.parseCookiePairs(setCookieHeader);
+    const allCookies = this.parseSetCookiePairs(setCookieHeader);
     const existing = this.parseCookiePairs(this.data.cookie);
     const merged = { ...existing };
 
@@ -140,21 +140,36 @@ export class ConfigManager {
     const pairs: Record<string, string> = {};
     if (!cookieStr) return pairs;
 
-    const parts = cookieStr.split(/[,;]\s*/);
-    for (const part of parts) {
+    for (const part of cookieStr.split(';')) {
       const eqIdx = part.indexOf('=');
-      if (eqIdx > 0) {
-        const key = part.substring(0, eqIdx).trim();
-        const value = part.substring(eqIdx + 1).trim();
-        if (
-          key &&
-          !['path', 'domain', 'expires', 'max-age', 'httponly', 'secure', 'samesite'].includes(
-            key.toLowerCase(),
-          )
-        ) {
-          pairs[key] = value;
-        }
-      }
+      if (eqIdx <= 0) continue;
+      const key = part.substring(0, eqIdx).trim();
+      const value = part.substring(eqIdx + 1).trim();
+      if (key) pairs[key] = value;
+    }
+    return pairs;
+  }
+
+  /** Extract cookie name/value pairs without treating Expires commas as separators. */
+  private parseSetCookiePairs(header: string): Record<string, string> {
+    const pairs: Record<string, string> = {};
+    if (!header) return pairs;
+
+    // A Set-Cookie value starts with name=value. Attributes are ignored. When
+    // several cookies are folded into one header, a comma followed by a token
+    // and '=' marks the next cookie; commas inside Expires remain part of the
+    // current attribute and are never parsed as cookie values.
+    const starts = /(?:^|,)\s*([^=;,\s]+)=/g;
+    let match: RegExpExecArray | null;
+    while ((match = starts.exec(header))) {
+      const start = match.index + (header[match.index] === ',' ? 1 : 0);
+      const segment = header.slice(start).trimStart();
+      const eqIdx = segment.indexOf('=');
+      if (eqIdx <= 0) continue;
+      const key = segment.slice(0, eqIdx).trim();
+      const remainder = segment.slice(eqIdx + 1);
+      const end = remainder.search(/;|,\s*[^=;,\s]+=/);
+      pairs[key] = (end >= 0 ? remainder.slice(0, end) : remainder).trim();
     }
     return pairs;
   }

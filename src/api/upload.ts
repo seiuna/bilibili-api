@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -41,13 +41,13 @@ export class UploadAPI {
     return UploadAPI.uploadBuffer(client, buffer, name);
   }
 
-  /** �?URL 下载图片并上�?*/
+
   static async uploadFromUrl(
     client: BiliClient<any>,
     url: string,
     filename?: string,
   ): Promise<BiliApiResponse<UploadImageResult>> {
-    const res = await fetch(url);
+    const res = await client.rawRequest(url);
     if (!res.ok) throw new Error(`下载图片失败: HTTP ${res.status}`);
 
     const buffer = Buffer.from(await res.arrayBuffer());
@@ -106,10 +106,10 @@ export class UploadAPI {
       headers['Cookie'] = client.config.data.cookie;
     }
 
-    const res = await fetch(
-      'https://api.bilibili.com/x/dynamic/feed/draw/upload_bfs',
-      { method: 'POST', headers, body },
-    );
-    return res.json();
+    return client.request('https://api.bilibili.com/x/dynamic/feed/draw/upload_bfs', {
+      method: 'POST',
+      headers,
+      body,
+    });
   }
 }

@@ -101,7 +101,7 @@ export function assertOk<T extends { code: number; message: string }>(data: T): 
 export interface RequestInit {
   method?: string;
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | Uint8Array;
   /** 是否需要 WBI 签名 */
   wbi?: boolean;
   /** 是否自动检查 code（非 0 抛异常） */
@@ -116,6 +116,12 @@ export class BiliClient<T = void> {
   private refreshPromise: Promise<void> | null = null;
 
   private customFetch: typeof fetch | null;
+
+  /** Internal transport for APIs that need raw Response access. */
+  async rawRequest(url: string, options: RequestInit = {}): Promise<Response> {
+    const fetcher = this.customFetch ?? fetch;
+    return this.doRequest(fetcher, url, options);
+  }
 
   constructor(configPath?: string, customFetch?: typeof fetch) {
     this.config = new ConfigManager(configPath);
@@ -179,7 +185,8 @@ export class BiliClient<T = void> {
           const result = await loginByWebQrcode(this.config, qrcodeOptions);
           if (!result.success) throw new AuthRequiredError(result.message);
         }
-      } catch {
+      } catch (error) {
+        if (!(error instanceof CredentialRefreshError)) throw error;
         const result = await loginByWebQrcode(this.config, qrcodeOptions);
         if (!result.success) throw new AuthRequiredError(result.message);
       }
@@ -323,7 +330,7 @@ export class BiliClient<T = void> {
     const res = await fetcher(url, {
       method: options.method ?? 'GET',
       headers: headers as any,
-      body: options.body,
+      body: options.body as BodyInit | undefined,
     });
 
     const setCookie = res.headers.get('set-cookie');
