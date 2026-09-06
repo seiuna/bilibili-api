@@ -1,6 +1,6 @@
 {
   "name": "@seiuna/bilibili-api",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "类型安全的 Bilibili API 客户端 — 扫码登录、评论区、私信、用户空间、图片上传，支持自动凭证刷新与 Generator 分页",
   "keywords": [
     "bilibili",
