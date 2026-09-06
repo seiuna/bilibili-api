@@ -361,9 +361,11 @@ export class BiliClient<T = void> {
       body: options.body as BodyInit | undefined,
     });
 
-    const setCookie = res.headers.get('set-cookie');
-    if (setCookie) {
-      await this.config.mergeCookie(setCookie);
+    const setCookies = typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : (res.headers.get('set-cookie') ?? '');
+    if (Array.isArray(setCookies) ? setCookies.length > 0 : Boolean(setCookies)) {
+      await this.config.mergeCookie(setCookies);
     }
 
     return res;
@@ -509,12 +511,25 @@ export class BiliClient<T = void> {
     return res.data;
   }
 
-  /** 获取当前登录用户的 User 实体 — 需要登录 */
+  /**
+   * 获取当前登录用户的 User 实体 — 需要登录
+   * 
+   * 💡 **选型与网络开销建议**：
+   * - 若仅用于展示当前登录用户自身的基础属性（UID、昵称、等级、硬币、大会员等），推荐优先使用单次请求的 {@link getMyInfo}；
+   * - 若需要执行实体业务操作（如关注 `follow()`、拉黑 `block()`、获取状态数 `getStat()` 等），建议选用本方法；
+   * - 本方法优先利用本地缓存的 mid / Cookie DedeUserID 调用 `getUser(mid)`；若本地完全未识别 mid 则会额外请求一次 `getMyInfo()`。
+   */
   async getCurrentUser(
     this: RequireAuth<T> extends never ? never : this,
   ): Promise<User> {
     const self = this as BiliClient<HasToken>;
     let mid = self.config.data.mid;
+    if (!mid) {
+      const extracted = self.config.extractUserId();
+      if (extracted) {
+        mid = Number(extracted);
+      }
+    }
     if (!mid) {
       const myInfo = await self.getMyInfo();
       mid = myInfo.mid;

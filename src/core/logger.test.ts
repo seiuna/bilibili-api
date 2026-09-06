@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { logger, getLogger, configureLogger } from './logger.js';
+import { logger, getLogger, configureLogger, setLogger } from './logger.js';
 
 describe('Logger', () => {
   it('should get default logger instance', () => {
@@ -14,16 +14,19 @@ describe('Logger', () => {
     expect(customLogger.category).toBe('custom-category');
   });
 
-  it('should support re-configuration', () => {
-    expect(() => {
-      configureLogger({
-        appenders: {
-          out: { type: 'stdout' },
-        },
-        categories: {
-          default: { appenders: ['out'], level: 'debug' },
-        },
-      });
-    }).not.toThrow();
+  it('should support injecting custom logger implementation via setLogger', () => {
+    const logs: string[] = [];
+    const mockCustomLogger = {
+      debug: (msg: string) => logs.push(`debug:${msg}`),
+      info: (msg: string) => logs.push(`info:${msg}`),
+      warn: (msg: string) => logs.push(`warn:${msg}`),
+      error: (msg: string) => logs.push(`error:${msg}`),
+    };
+
+    setLogger(mockCustomLogger, 'injected-cat');
+    const injected = getLogger('injected-cat');
+    injected.info('test-custom-message');
+
+    expect(logs).toContain('info:test-custom-message');
   });
 });

@@ -89,6 +89,22 @@ describe('Config Profile & Functional fromProfiles', () => {
       expect(existsUserJson).toBe(false);
     });
 
+    it('should support array input from Headers.getSetCookie() and handle commas in attributes', async () => {
+      const customProfile = path.join(profilesDir, 'array-test.json');
+      const config = new ConfigManager(customProfile);
+
+      await config.setAuthCookies([
+        'DedeUserID=555666; Domain=.bilibili.com; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT',
+        'SESSDATA=sess_array_val; Domain=.bilibili.com; Path=/; HttpOnly',
+        'bili_jct=csrf_array_val; Domain=.bilibili.com; Path=/',
+      ]);
+
+      expect(config.data.cookie).toContain('DedeUserID=555666');
+      expect(config.data.cookie).toContain('SESSDATA=sess_array_val');
+      expect(config.data.cookie).toContain('bili_jct=csrf_array_val');
+      expect(config.extractUserId()).toBe('555666');
+    });
+
     it('should extract userId correctly from mid or cookie', async () => {
       const config = new ConfigManager(path.join(profilesDir, 'test.json'));
       expect(config.extractUserId()).toBeNull();
@@ -198,6 +214,10 @@ describe('Config Profile & Functional fromProfiles', () => {
         // 验证磁盘上的文件存在
         const migratedContent = await fs.readFile(path.resolve(profilesDir, '778899.json'), 'utf-8');
         expect(migratedContent).toContain('778899');
+
+        // 验证旧文件已安全备份为 .bak 而不是物理删除
+        const bakExists = await fs.access(`${legacyPath}.bak`).then(() => true).catch(() => false);
+        expect(bakExists).toBe(true);
       } finally {
         (ConfigManager as any).LEGACY_CONFIG_PATH = originalLegacy;
         (ConfigManager as any).DEFAULT_PROFILES_DIR = originalProfiles;

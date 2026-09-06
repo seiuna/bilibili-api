@@ -607,6 +607,8 @@ const signed = wbiSign({ id: 123 }, imgKey, subKey);
   const clientCustom = await BiliClient.create('./my-config.json');
   ```
 
+> ⚠️ **多账号并发提示**：在多进程或多实例并发初始化时，无参调用 `BiliClient.create()` 依赖扫描目录获取最新修改的 Profile，可能存在状态不确定性。在并发或多账号场景下，**强烈建议显式指定 UID 或 Profile 别名**，或统一使用 `fromProfiles` 进行批量加载。
+
 ### 3. 函数式批量加载客户端 (`fromProfiles`)
 可通过函数式谓词从 `profiles/` 批量筛选并初始化客户端：
 
@@ -627,7 +629,28 @@ const myClients = await BiliClient.fromProfiles((user) => {
 });
 ```
 
-*(兼容说明：若根目录下存在旧版 `bili-config.json`，系统会自动平滑迁移至 `profiles/<userid>.json`)*
+*(兼容说明：若根目录下存在旧版 `bili-config.json`，系统会自动平滑迁移至 `profiles/<userid>.json` 并备份为 `bili-config.json.bak`)*
+
+---
+
+## 日志系统与自定义 Logger
+
+SDK 默认内置零额外依赖的轻量彩色控制台 Logger，不强绑第三方重型日志库：
+
+```ts
+import { logger, getLogger, setLogger } from '@seiuna/bilibili-api';
+
+// 1. 直接使用内置 Logger（可通过环境变量 LOG_LEVEL 控制 debug/info/warn/error）
+logger.info('这是一条信息日志');
+
+// 2. 自定义注入外部 Logger（如 Winston / Pino / log4js 实例）
+setLogger({
+  debug: console.debug,
+  info: console.info,
+  warn: console.warn,
+  error: console.error,
+});
+```
 
 ---
 

@@ -199,9 +199,10 @@ export class ConfigManager {
         await fs.mkdir(ConfigManager.DEFAULT_PROFILES_DIR, { recursive: true });
         await fs.writeFile(targetPath, JSON.stringify(parsed, null, 2), 'utf-8');
         try {
-          await fs.unlink(ConfigManager.LEGACY_CONFIG_PATH);
+          const bakPath = `${ConfigManager.LEGACY_CONFIG_PATH}.bak`;
+          await fs.rename(ConfigManager.LEGACY_CONFIG_PATH, bakPath);
         } catch {
-          // ignore
+          // ignore rename error
         }
         return targetPath;
       }
@@ -233,10 +234,10 @@ export class ConfigManager {
     }
   }
 
-  /** 合并 Set-Cookie 头 */
-  async mergeCookie(setCookieHeader: string): Promise<void> {
+  /** 合并 Set-Cookie 头（支持单字符串或 Headers.getSetCookie() 返回的字符串数组） */
+  async mergeCookie(setCookieInput: string | string[]): Promise<void> {
     const existing = this.parseCookiePairs(this.data.cookie);
-    const incoming = this.parseSetCookiePairs(setCookieHeader);
+    const incoming = this.resolveSetCookiePairs(setCookieInput);
 
     const merged = { ...existing, ...incoming };
     this.data.cookie = Object.entries(merged)
@@ -251,8 +252,8 @@ export class ConfigManager {
     }
   }
 
-  /** 仅合并重要鉴权 Cookie */
-  async setAuthCookies(setCookieHeader: string): Promise<void> {
+  /** 仅合并重要鉴权 Cookie（支持单字符串或字符串数组） */
+  async setAuthCookies(setCookieInput: string | string[]): Promise<void> {
     const importantKeys = [
       'DedeUserID',
       'DedeUserID__ckMd5',
@@ -261,7 +262,7 @@ export class ConfigManager {
       'sid',
     ];
 
-    const allCookies = this.parseSetCookiePairs(setCookieHeader);
+    const allCookies = this.resolveSetCookiePairs(setCookieInput);
     const existing = this.parseCookiePairs(this.data.cookie);
     const merged = { ...existing };
 
@@ -419,6 +420,25 @@ export class ConfigManager {
       if (key) pairs[key] = value;
     }
     return pairs;
+  }
+
+  /** 解析单条或多条 Set-Cookie，优先处理数组输入 */
+  private resolveSetCookiePairs(input: string | string[]): Record<string, string> {
+    if (Array.isArray(input)) {
+      const pairs: Record<string, string> = {};
+      for (const line of input) {
+        if (!line) continue;
+        const firstSemi = line.indexOf(';');
+        const mainPart = firstSemi > 0 ? line.slice(0, firstSemi) : line;
+        const eqIdx = mainPart.indexOf('=');
+        if (eqIdx <= 0) continue;
+        const key = mainPart.slice(0, eqIdx).trim();
+        const value = mainPart.slice(eqIdx + 1).trim();
+        if (key) pairs[key] = value;
+      }
+      return pairs;
+    }
+    return this.parseSetCookiePairs(input);
   }
 
   /** Extract cookie name/value pairs without treating Expires commas as separators. */
