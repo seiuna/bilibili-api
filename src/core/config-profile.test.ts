@@ -69,6 +69,26 @@ describe('Config Profile & Functional fromProfiles', () => {
       expect(parsed.cookie).toContain('bili_jct=test-csrf');
     });
 
+    it('should keep custom profile name (e.g. default-test.json) when explicitly specified', async () => {
+      // 显式指定 profile 名称 "default-test"
+      const customProfile = path.join(profilesDir, 'default-test.json');
+      const config = new ConfigManager(customProfile);
+
+      // 模拟接收登录 Cookie
+      await config.setAuthCookies('DedeUserID=123456; Path=/, SESSDATA=test-sess; Path=/, bili_jct=test-csrf; Path=/');
+
+      // 验证仍然保存为 default-test.json，而不是 123456.json
+      const currentPath = config.getConfigPath();
+      expect(path.basename(currentPath)).toBe('default-test.json');
+
+      const content = await fs.readFile(currentPath, 'utf-8');
+      expect(JSON.parse(content).cookie).toContain('DedeUserID=123456');
+
+      // 验证没有生成 123456.json
+      const existsUserJson = await fs.access(path.join(profilesDir, '123456.json')).then(() => true).catch(() => false);
+      expect(existsUserJson).toBe(false);
+    });
+
     it('should extract userId correctly from mid or cookie', async () => {
       const config = new ConfigManager(path.join(profilesDir, 'test.json'));
       expect(config.extractUserId()).toBeNull();

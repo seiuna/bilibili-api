@@ -94,30 +94,39 @@ export class ConfigManager {
   }
 
   /**
-   * 为指定用户创建/绑定 profile 文件
-   * 所有用户配置文件统一写入 profiles/<userId>.json
+   * 为指定用户创建/绑定 profile 文件：
+   * 1. 若用户未显式指定 profile（isExplicitPath === false）或当前为 default.json，
+   *    登录成功后自动升级创建为 profiles/<userId>.json，并清理临时文件。
+   * 2. 若用户显式指定了 profile 名称（如 "default-test"），则严格保存到指定的 profiles/<name>.json，不篡改文件名。
    */
   async createProfileForUser(userId: string | number): Promise<string> {
     const idStr = String(userId).trim();
-    if (!idStr) return this.configPath;
 
-    const targetPath = path.resolve(ConfigManager.DEFAULT_PROFILES_DIR, `${idStr}.json`);
-    const oldPath = this.configPath;
+    // 仅在未显式指定 profile，或当前处于 default.json 时，才自动按 userId 改名
+    if (!this.isExplicitPath || path.basename(this.configPath) === 'default.json') {
+      if (idStr) {
+        const targetPath = path.resolve(ConfigManager.DEFAULT_PROFILES_DIR, `${idStr}.json`);
+        const oldPath = this.configPath;
 
-    this.configPath = targetPath;
-    this.isExplicitPath = true;
+        this.configPath = targetPath;
+        this.isExplicitPath = true;
 
-    await this.save();
+        await this.save();
 
-    // 如果旧文件存在且不同于新文件，清理旧文件
-    if (oldPath !== targetPath) {
-      try {
-        await fs.unlink(oldPath);
-      } catch {
-        // 忽略清理异常
+        if (oldPath !== targetPath) {
+          try {
+            await fs.unlink(oldPath);
+          } catch {
+            // 忽略清理异常
+          }
+        }
+        return targetPath;
       }
     }
-    return targetPath;
+
+    // 显式指定 profile 名称时，直接保存到当前指定的文件
+    await this.save();
+    return this.configPath;
   }
 
   async load(): Promise<void> {
