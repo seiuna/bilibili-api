@@ -40,3 +40,17 @@
 - ESM only，`"type": "module"`，import 路径带 `.js` 扩展名。
 - `tsconfig.json` 开启 `strict`、`moduleResolution: bundler`。
 - `tsup` 只打包 `index.ts`，`files` 只发布 `dist/`。
+
+## 开发与 Code Review 注意事项
+
+- 提交前应在干净安装环境执行 `npm ci`、`npm run build`、`npx tsc --noEmit` 和 `npm test`；不要因为本地缺少依赖而忽略构建或类型错误。
+- 内部模块引用 `BiliClient` 时优先从 `src/core/client.ts` 使用 `import type`，不要从 `src/index.ts` 或根入口引入，以避免 ESM 循环依赖。
+- 所有网络请求都应使用 `BiliClient` 的统一请求通道和 `customFetch`；上传、下载等功能不得直接调用全局 `fetch`，否则会绕过测试替身、Cookie、Authorization 和凭证刷新逻辑。
+- 处理 `Set-Cookie` 时不得简单按逗号或分号拆分完整头部；必须正确处理多个 Cookie 以及 `Expires` 属性，避免破坏登录凭证。
+- 动态 ID、评论 ID 等服务端字符串 ID 不得无必要地转换为 `number`；可能超过 `Number.MAX_SAFE_INTEGER` 的 ID 应保持为字符串传输。
+- URL 编码请求体的 `Content-Type` 必须是 `application/x-www-form-urlencoded`；只有真正构造 multipart 边界和分段时才能声明 `multipart/form-data`。
+- 公开 API 的写操作应统一错误语义：要么使用 `checkedRequest()` 抛出业务错误，要么明确保持原始 `BiliApiResponse`，不要让实体方法静默吞掉非零 `code`。
+- 可选数值参数应使用 `!== undefined` 判断，不要用 truthiness 判断，以免意外丢失合法的 `0` 值。
+- `ensureLogin()` 只应在凭证明确失效时回退到二维码登录；网络错误、响应解析错误和程序错误应继续抛出，避免意外阻塞式登录。
+- 文章实体的 `id` 必须来自可靠的 CVID 数据；不得使用 `pre + 1` 或恒定 `0` 等推导作为文章标识。
+- WBI 签名和 URL 重建应保留重复查询参数及其语义；将查询参数压成普通对象会丢失重复键。
