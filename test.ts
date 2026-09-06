@@ -41,7 +41,7 @@ async function main() {
     },
   });
   log('Login', '成功');
-
+  
   // ========================
   // 1. CommonAPI — 公共工具
   // ========================
@@ -143,8 +143,13 @@ async function main() {
 
   try {
     const navInfo = await UserAPI.getNavInfo(authed);
-    log('User', `getNavInfo: code=${navInfo.code}`);
+    log('User', `getNavInfo: code=${navInfo.code} uname=${navInfo.data?.uname}`);
   } catch (e: any) { log('User', `getNavInfo 失败: ${e.message}`); }
+
+  try {
+    const myInfoRes = await UserAPI.getMyInfo(authed);
+    log('User', `UserAPI.getMyInfo: code=${myInfoRes.code} name=${myInfoRes.data?.name} mid=${myInfoRes.data?.mid}`);
+  } catch (e: any) { log('User', `UserAPI.getMyInfo 失败: ${e.message}`); }
 
   try {
     const memberAccount = await UserAPI.getMemberAccount(authed);
@@ -553,6 +558,21 @@ async function main() {
   // 22. Entity 门面方法
   // ========================
   console.log('\n========== 22. Entity 门面方法 ==========');
+  try {
+    const myInfo = await authed.getMyInfo();
+    log('Facade', `getMyInfo: name=${myInfo.name} mid=${myInfo.mid} coins=${myInfo.coins}`);
+  } catch (e: any) { log('Facade', `getMyInfo 失败: ${e.message}`); }
+
+  try {
+    const navInfo = await authed.getNavInfo();
+    log('Facade', `getNavInfo: uname=${navInfo.uname} isLogin=${navInfo.isLogin}`);
+  } catch (e: any) { log('Facade', `getNavInfo 失败: ${e.message}`); }
+
+  try {
+    const currentUser = await authed.getCurrentUser();
+    log('Facade', `getCurrentUser: name=${currentUser.name} mid=${currentUser.mid} level=${currentUser.level}`);
+  } catch (e: any) { log('Facade', `getCurrentUser 失败: ${e.message}`); }
+
   try {
     const facadeVideo = await authed.getVideo(TEST_BVID);
     log('Facade', `getVideo: ${facadeVideo.title}`);

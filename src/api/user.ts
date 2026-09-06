@@ -1,7 +1,166 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 // ---- 类型定义 ----
+
+export interface MyInfo {
+  mid: number;
+  name: string;
+  sex: string;
+  face: string;
+  sign: string;
+  rank: number;
+  level: number;
+  jointime: number;
+  moral: number;
+  silence: number;
+  email_status: number;
+  tel_status: number;
+  identification: number;
+  vip: {
+    type: number;
+    status: number;
+    due_date: number;
+    vip_pay_type: number;
+    theme_type: number;
+    label: {
+      path: string;
+      text: string;
+      label_theme: string;
+      text_color: string;
+      bg_style: number;
+      bg_color: string;
+      border_color: string;
+      use_img_label?: boolean;
+      img_label_uri_hans?: string;
+      img_label_uri_hant?: string;
+      img_label_uri_hans_static?: string;
+      img_label_uri_hant_static?: string;
+    };
+    avatar_subscript: number;
+    nickname_color: string;
+    role?: number;
+    avatar_subscript_url?: string;
+  };
+  birthday: number;
+  is_tourist: number;
+  is_fake_account: number;
+  pin_prompting: number;
+  is_deleted: number;
+  coins: number;
+  following: number;
+  follower: number;
+  pendant?: {
+    pid: number;
+    name: string;
+    image: string;
+    expire: number;
+    image_enhance?: string;
+    image_enhance_frame?: string;
+  };
+  nameplate?: {
+    nid: number;
+    name: string;
+    image: string;
+    image_small: string;
+    level: string;
+    condition: string;
+  };
+  official?: {
+    role: number;
+    title: string;
+    desc: string;
+    type: number;
+  };
+  level_exp?: {
+    current_level: number;
+    current_min: number;
+    current_exp: number;
+    next_exp: number | string;
+  };
+  profession?: {
+    id: number;
+    name: string;
+    show_name: string;
+  };
+  in_reg_audit?: number;
+  is_rip_user?: boolean;
+}
+
+export interface NavInfo {
+  isLogin: boolean;
+  email_verified: number;
+  face: string;
+  face_nft?: number;
+  face_nft_type?: number;
+  level_info: {
+    current_level: number;
+    current_min: number;
+    current_exp: number;
+    next_exp: number | string;
+  };
+  mid: number;
+  mobile_verified: number;
+  money: number;
+  moral: number;
+  official: {
+    role: number;
+    title: string;
+    desc: string;
+    type: number;
+  };
+  officialVerify: {
+    type: number;
+    desc: string;
+  };
+  pendant: {
+    pid: number;
+    name: string;
+    image: string;
+    expire: number;
+    image_enhance?: string;
+    image_enhance_frame?: string;
+  };
+  scores: number;
+  uname: string;
+  vipDueDate: number;
+  vipStatus: number;
+  vipType: number;
+  vip_pay_type: number;
+  vip_theme_type: number;
+  vip_label: {
+    path: string;
+    text: string;
+    label_theme: string;
+    text_color?: string;
+    bg_style?: number;
+    bg_color?: string;
+    border_color?: string;
+    use_img_label?: boolean;
+    img_label_uri_hans?: string;
+    img_label_uri_hant?: string;
+    img_label_uri_hans_static?: string;
+    img_label_uri_hant_static?: string;
+  };
+  vip_avatar_subscript: number;
+  vip_nickname_color: string;
+  wallet?: {
+    mid: number;
+    bcoin_balance: number;
+    coupon_balance: number;
+    coupon_due_time: number;
+  };
+  has_shop?: boolean;
+  shop_url?: string;
+  allowance_count?: number;
+  answer_status?: number;
+  is_senior_member: number;
+  wbi_img?: {
+    img_url: string;
+    sub_url: string;
+  };
+  is_jury?: boolean;
+}
 
 export interface UserInfo {
   mid: number;
@@ -280,9 +439,13 @@ export class UserAPI {
   static async getLoginLog(client: BiliClient<any>): Promise<BiliApiResponse<LoginLogData>> {
     return client.request('https://api.bilibili.com/x/member/web/login/log');
   }
+  /** 获取登录用户空间详细信息 */
+  static async getMyInfo(client: BiliClient<any>): Promise<BiliApiResponse<MyInfo>> {
+    return client.request('https://api.bilibili.com/x/space/myinfo');
+  }
 
-  /** 获取登录基本信息（导航栏用户信息�?*/
-  static async getNavInfo(client: BiliClient<any>): Promise<BiliApiResponse<unknown>> {
+  /** 获取登录基本信息（导航栏用户信息） */
+  static async getNavInfo(client: BiliClient<any>): Promise<BiliApiResponse<NavInfo>> {
     return client.request('https://api.bilibili.com/x/web-interface/nav');
   }
 

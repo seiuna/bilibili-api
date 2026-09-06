@@ -1,12 +1,13 @@
 import { BiliClient } from '../src/core/client.js';
 import { MessageAPI } from '../src/api/message.js';
 import { AtNotifyItem } from '../src/entities/NotifyItem.js';
+import { logger } from '../src/core/logger.js';
 
 const client = await BiliClient.create();
 
 const authedClient = await client.ensureLogin({
   onStatusChange: (status, msg, _qrcodeBase64, qrcodeTerminal) => {
-    console.log(`[${status}] ${msg}`);
+    logger.info(`[${status}] ${msg}`);
     if (qrcodeTerminal) console.log(qrcodeTerminal);
   },
 });
@@ -18,11 +19,11 @@ const interval = setInterval(async () => {
     for await (const rawItem of MessageAPI.atFeed(authedClient)) {
       if (atCount-- <= 0) break;
       const atItem = new AtNotifyItem(authedClient, rawItem);
-      console.log(`#${atItem.sourceId} [${atItem.businessId}]: ${atItem.content}`);
+      logger.info(`#${atItem.sourceId} [${atItem.businessId}]: ${atItem.content}`);
       await atItem.reply(atItem.content);
     }
-    console.log('未读消息数:', count.data.at);
+    logger.info('未读消息数:', count.data.at);
   }
 }, 10000);
 
-console.log('完成');
+logger.info('完成');
