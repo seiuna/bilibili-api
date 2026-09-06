@@ -465,6 +465,35 @@ export class BiliClient<T = void> {
   // 门面方法 (Facade) — 需要认证（HasToken）
   // ==========================================
 
+  /** 获取当前登录用户空间详细信息 — 需要登录 */
+  async getMyInfo(
+    this: RequireAuth<T> extends never ? never : this,
+  ): Promise<import('../api/user.js').MyInfo> {
+    const res = await UserAPI.getMyInfo(this);
+    return res.data;
+  }
+
+  /** 获取登录基本信息（导航栏用户信息） — 需要登录 */
+  async getNavInfo(
+    this: RequireAuth<T> extends never ? never : this,
+  ): Promise<import('../api/user.js').NavInfo> {
+    const res = await UserAPI.getNavInfo(this);
+    return res.data;
+  }
+
+  /** 获取当前登录用户的 User 实体 — 需要登录 */
+  async getCurrentUser(
+    this: RequireAuth<T> extends never ? never : this,
+  ): Promise<User> {
+    const self = this as BiliClient<HasToken>;
+    let mid = self.config.data.mid;
+    if (!mid) {
+      const myInfo = await self.getMyInfo();
+      mid = myInfo.mid;
+    }
+    return self.getUser(mid);
+  }
+
   /** 获取历史记录 — 需要登录 */
   async getHistory(
     this: RequireAuth<T> extends never ? never : this,

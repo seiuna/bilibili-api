@@ -53,6 +53,7 @@ const authed = await client.ensureLogin({             // ← 返回 BiliClient<H
 });
 
 // 现在可以调用需要登录的方法
+const myInfo = await authed.getMyInfo();               // ✅ 获取当前登录用户信息
 const toView = await authed.history.getToViewList();  // ✅
 const unread = await authed.message.unreadCount();     // ✅
 
