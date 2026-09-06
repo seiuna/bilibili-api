@@ -68,6 +68,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function extractSetCookies(headers: Headers): string | string[] {
+  if (typeof headers.getSetCookie === 'function') {
+    const list = headers.getSetCookie();
+    if (list.length > 0) return list;
+  }
+  return headers.get('set-cookie') ?? '';
+}
+
 // ---- Web 端二维码登录 ----
 
 export async function loginByWebQrcode(
@@ -86,8 +94,10 @@ export async function loginByWebQrcode(
     return { success: false, message: `申请二维码失败: HTTP ${genRes.status}` };
   }
 
-  const genSetCookie = genRes.headers.get('set-cookie');
-  if (genSetCookie) await config.mergeCookie(genSetCookie);
+  const genSetCookie = extractSetCookies(genRes.headers);
+  if (Array.isArray(genSetCookie) ? genSetCookie.length > 0 : Boolean(genSetCookie)) {
+    await config.mergeCookie(genSetCookie);
+  }
 
   const genJson: BiliApiResponse<QrcodeGenerateData> = await genRes.json();
   if (genJson.code !== 0) {
@@ -133,8 +143,10 @@ export async function loginByWebQrcode(
         return { success: false, message: '二维码已失效，请重新生成' };
 
       case QrcodeStatus.SUCCESS: {
-        const setCookie = pollRes.headers.get('set-cookie');
-        if (setCookie) await config.setAuthCookies(setCookie);
+        const setCookie = extractSetCookies(pollRes.headers);
+        if (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) {
+          await config.setAuthCookies(setCookie);
+        }
 
         const refreshToken = pollJson.data?.refresh_token ?? '';
         if (refreshToken) await config.updateRefreshToken(refreshToken);
@@ -323,8 +335,10 @@ export async function loginByPassword(
     body: body.toString(),
   });
 
-  const setCookie = loginRes.headers.get('set-cookie');
-  if (setCookie) await config.setAuthCookies(setCookie);
+  const setCookie = extractSetCookies(loginRes.headers);
+  if (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) {
+    await config.setAuthCookies(setCookie);
+  }
 
   const loginJson: BiliApiResponse<{
     status: number;
@@ -436,8 +450,10 @@ export async function loginBySms(
     body: body.toString(),
   });
 
-  const setCookie = res.headers.get('set-cookie');
-  if (setCookie) await config.setAuthCookies(setCookie);
+  const setCookie = extractSetCookies(res.headers);
+  if (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) {
+    await config.setAuthCookies(setCookie);
+  }
 
   const json: BiliApiResponse<{
     status: number;

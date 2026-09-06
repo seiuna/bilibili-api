@@ -26,7 +26,10 @@
 
 ## 凭证与配置文件
 
-- `bili-config.json` 存储真实 cookie / refresh_token；`.gitignore` 已忽略它，但它目前仍被 git tracking，**不要继续提交变更**。如需从版本控制移除：`git rm --cached bili-config.json`。
+- 账号凭证默认保存在 `profiles/<userid>.json`（`<userid>` 为数字 UID），登录成功后会自动建档。
+- `profiles/` 目录已被 `.gitignore` 忽略，不得提交真实账号凭证。
+- 多账号或并发初始化场景，强烈推荐显式指定 UID 或 Profile 别名，避免无参自动探测导致的实例竞态。
+- 旧根目录 `bili-config.json` 会在无 profiles 时自动平滑迁移至 `profiles/<userid>.json` 并备份为 `bili-config.json.bak`。
 - `test-config.json` 是当前未使用的测试凭证占位文件。
 - 任何调用写接口（发评、点赞、私信等）都需要有效的 `bili_jct`（CSRF token）。
 

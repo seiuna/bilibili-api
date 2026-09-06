@@ -6,8 +6,9 @@
 export { BiliClient, CredentialRefreshError, AuthRequiredError, BiliApiError, assertOk } from './core/client.js';
 export type { RequestInit, HasToken } from './core/client.js';
 export { ConfigManager } from './core/config.js';
-export { logger, getLogger, configureLogger, log4js } from './core/logger.js';
-export type { Logger, Log4jsConfiguration } from './core/logger.js';
+export type { ProfileUser, ProfileFilter, FromProfilesOptions } from './core/config.js';
+export { logger, getLogger, configureLogger, setLogger, log4js } from './core/logger.js';
+export type { Logger, ILogger, Log4jsConfiguration } from './core/logger.js';
 export { signParams, buildSignedQuery, wbiSign, buildWbiSignedQuery } from './core/sign.js';
 export {
   loginByWebQrcode,

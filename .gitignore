@@ -2,5 +2,6 @@ node_modules
 dist
 bili-config.json
 test-config.json
+profiles
 api-doc
 scripts

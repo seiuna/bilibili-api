@@ -123,19 +123,36 @@ export class BiliClient<T = void> {
     return this.doRequest(fetcher, url, options);
   }
 
-  constructor(configPath?: string, customFetch?: typeof fetch) {
-    this.config = new ConfigManager(configPath);
+  /** 获取当前登录用户 ID（若未登录或未识别则返回 null） */
+  get userId(): string | null {
+    return this.config.extractUserId();
+  }
+
+  constructor(configPathOrUserId?: string | number, customFetch?: typeof fetch) {
+    this.config = new ConfigManager(configPathOrUserId);
     this.customFetch = customFetch ?? null;
   }
 
   /** 创建并加载客户端（未认证状态） */
   static async create(
-    configPath?: string,
+    configPathOrUserId?: string | number,
     customFetch?: typeof fetch,
   ): Promise<BiliClient<void>> {
-    const client = new BiliClient<void>(configPath, customFetch);
+    const client = new BiliClient<void>(configPathOrUserId, customFetch);
     await client.config.load();
     return client;
+  }
+
+  /**
+   * 从 profiles 目录下批量创建客户端列表（函数式接口）
+   * @param predicate 过滤谓词函数
+   * @param options 批量创建选项
+   */
+  static async fromProfiles(
+    predicate?: import('./config.js').ProfileFilter,
+    options?: import('./config.js').FromProfilesOptions,
+  ): Promise<BiliClient<any>[]> {
+    return ConfigManager.fromProfiles<BiliClient<any>>(predicate, options);
   }
 
   // ==========================================
@@ -194,6 +211,7 @@ export class BiliClient<T = void> {
       const result = await loginByWebQrcode(this.config, qrcodeOptions);
       if (!result.success) throw new AuthRequiredError(result.message);
     }
+    await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
   }
 
@@ -203,6 +221,7 @@ export class BiliClient<T = void> {
   ): Promise<BiliClient<HasToken>> {
     const result = await loginByWebQrcode(this.config, options);
     if (!result.success) throw new AuthRequiredError(result.message);
+    await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
   }
 
@@ -212,6 +231,7 @@ export class BiliClient<T = void> {
   ): Promise<BiliClient<HasToken>> {
     const result = await loginByTvQrcode(this.config, options);
     if (!result.success) throw new AuthRequiredError(result.message);
+    await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
   }
 
@@ -226,7 +246,15 @@ export class BiliClient<T = void> {
   ): Promise<BiliClient<HasToken>> {
     const result = await loginByPassword(this.config, username, password, options);
     if (!result.success) throw new AuthRequiredError(result.message);
+    await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
+  }
+
+  private async ensureProfileCreated(): Promise<void> {
+    const userId = this.config.extractUserId();
+    if (userId) {
+      await this.config.createProfileForUser(userId);
+    }
   }
 
   /** 退出登录 — 返回未认证客户端 */
@@ -333,9 +361,11 @@ export class BiliClient<T = void> {
       body: options.body as BodyInit | undefined,
     });
 
-    const setCookie = res.headers.get('set-cookie');
-    if (setCookie) {
-      await this.config.mergeCookie(setCookie);
+    const setCookies = typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : (res.headers.get('set-cookie') ?? '');
+    if (Array.isArray(setCookies) ? setCookies.length > 0 : Boolean(setCookies)) {
+      await this.config.mergeCookie(setCookies);
     }
 
     return res;
@@ -481,12 +511,25 @@ export class BiliClient<T = void> {
     return res.data;
   }
 
-  /** 获取当前登录用户的 User 实体 — 需要登录 */
+  /**
+   * 获取当前登录用户的 User 实体 — 需要登录
+   * 
+   * 💡 **选型与网络开销建议**：
+   * - 若仅用于展示当前登录用户自身的基础属性（UID、昵称、等级、硬币、大会员等），推荐优先使用单次请求的 {@link getMyInfo}；
+   * - 若需要执行实体业务操作（如关注 `follow()`、拉黑 `block()`、获取状态数 `getStat()` 等），建议选用本方法；
+   * - 本方法优先利用本地缓存的 mid / Cookie DedeUserID 调用 `getUser(mid)`；若本地完全未识别 mid 则会额外请求一次 `getMyInfo()`。
+   */
   async getCurrentUser(
     this: RequireAuth<T> extends never ? never : this,
   ): Promise<User> {
     const self = this as BiliClient<HasToken>;
     let mid = self.config.data.mid;
+    if (!mid) {
+      const extracted = self.config.extractUserId();
+      if (extracted) {
+        mid = Number(extracted);
+      }
+    }
     if (!mid) {
       const myInfo = await self.getMyInfo();
       mid = myInfo.mid;

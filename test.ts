@@ -33,7 +33,7 @@ async function main() {
   // 0. 登录
   // ========================
   console.log('========== 0. 登录 ==========');
-  const client = await BiliClient.create();
+  const client = await BiliClient.create("default-test");
   const authed = await client.ensureLogin({
     onStatusChange: (status, msg, _base64, terminal) => {
       console.log(`[${status}] ${msg}`);

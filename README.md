@@ -582,16 +582,74 @@ const signed = wbiSign({ id: 123 }, imgKey, subKey);
 
 ---
 
-## 凭证持久化
+## 凭证持久化与多账号管理 (Profiles)
 
-登录后凭证自动保存到 `bili-config.json`（可通过 `BiliClient.create(path)` 自定义路径）：
+### 1. 默认保存为 `profiles/<userid>.json`
+登录后凭证将根据账号 UID 自动保存为 `profiles/<userid>.json`（例如 `profiles/390794259.json`），无需手动建档：
 
 ```json
 {
-  "cookie": "SESSDATA=xxx; bili_jct=yyy; ...",
+  "cookie": "DedeUserID=390794259; SESSDATA=xxx; bili_jct=yyy; ...",
   "refreshToken": "...",
-  "mid": 123456
+  "mid": 390794259
 }
+```
+
+### 2. 多账号加载与指定 Profile
+- **默认加载**：`BiliClient.create()` 自动探测已有 profile；若不存在，登录成功后自动创建 `profiles/<userid>.json`。
+- **指定账号**：通过数字 UID 或 Profile 名直接加载：
+  ```ts
+  const clientA = await BiliClient.create(390794259);
+  const clientB = await BiliClient.create('sub_account');
+  ```
+- **自定义路径**：传入文件路径兼容自定义存储：
+  ```ts
+  const clientCustom = await BiliClient.create('./my-config.json');
+  ```
+
+> ⚠️ **多账号并发提示**：在多进程或多实例并发初始化时，无参调用 `BiliClient.create()` 依赖扫描目录获取最新修改的 Profile，可能存在状态不确定性。在并发或多账号场景下，**强烈建议显式指定 UID 或 Profile 别名**，或统一使用 `fromProfiles` 进行批量加载。
+
+### 3. 函数式批量加载客户端 (`fromProfiles`)
+可通过函数式谓词从 `profiles/` 批量筛选并初始化客户端：
+
+```ts
+import { ConfigManager, BiliClient } from '@seiuna/bilibili-api';
+
+// 场景 1：无条件创建所有已有 Profile 的客户端
+const allClients = await BiliClient.fromProfiles();
+
+// 场景 2：函数式筛选仅创建已登录的客户端
+const authedClients = await ConfigManager.fromProfiles((user, isRequestLogin) => {
+  return isRequestLogin; // 只选有登录凭证的账号
+});
+
+// 场景 3：根据 UID 列表定向加载
+const myClients = await BiliClient.fromProfiles((user) => {
+  return ['390794259', '123456789'].includes(user.userId);
+});
+```
+
+*(兼容说明：若根目录下存在旧版 `bili-config.json`，系统会自动平滑迁移至 `profiles/<userid>.json` 并备份为 `bili-config.json.bak`)*
+
+---
+
+## 日志系统与自定义 Logger
+
+SDK 默认内置零额外依赖的轻量彩色控制台 Logger，不强绑第三方重型日志库：
+
+```ts
+import { logger, getLogger, setLogger } from '@seiuna/bilibili-api';
+
+// 1. 直接使用内置 Logger（可通过环境变量 LOG_LEVEL 控制 debug/info/warn/error）
+logger.info('这是一条信息日志');
+
+// 2. 自定义注入外部 Logger（如 Winston / Pino / log4js 实例）
+setLogger({
+  debug: console.debug,
+  info: console.info,
+  warn: console.warn,
+  error: console.error,
+});
 ```
 
 ---
