@@ -123,19 +123,36 @@ export class BiliClient<T = void> {
     return this.doRequest(fetcher, url, options);
   }
 
-  constructor(configPath?: string, customFetch?: typeof fetch) {
-    this.config = new ConfigManager(configPath);
+  /** 获取当前登录用户 ID（若未登录或未识别则返回 null） */
+  get userId(): string | null {
+    return this.config.extractUserId();
+  }
+
+  constructor(configPathOrUserId?: string | number, customFetch?: typeof fetch) {
+    this.config = new ConfigManager(configPathOrUserId);
     this.customFetch = customFetch ?? null;
   }
 
   /** 创建并加载客户端（未认证状态） */
   static async create(
-    configPath?: string,
+    configPathOrUserId?: string | number,
     customFetch?: typeof fetch,
   ): Promise<BiliClient<void>> {
-    const client = new BiliClient<void>(configPath, customFetch);
+    const client = new BiliClient<void>(configPathOrUserId, customFetch);
     await client.config.load();
     return client;
+  }
+
+  /**
+   * 从 profiles 目录下批量创建客户端列表（函数式接口）
+   * @param predicate 过滤谓词函数
+   * @param options 批量创建选项
+   */
+  static async fromProfiles(
+    predicate?: import('./config.js').ProfileFilter,
+    options?: import('./config.js').FromProfilesOptions,
+  ): Promise<BiliClient<any>[]> {
+    return ConfigManager.fromProfiles<BiliClient<any>>(predicate, options);
   }
 
   // ==========================================
@@ -194,6 +211,7 @@ export class BiliClient<T = void> {
       const result = await loginByWebQrcode(this.config, qrcodeOptions);
       if (!result.success) throw new AuthRequiredError(result.message);
     }
+    await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
   }
 
@@ -203,6 +221,7 @@ export class BiliClient<T = void> {
   ): Promise<BiliClient<HasToken>> {
     const result = await loginByWebQrcode(this.config, options);
     if (!result.success) throw new AuthRequiredError(result.message);
+    await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
   }
 
@@ -212,6 +231,7 @@ export class BiliClient<T = void> {
   ): Promise<BiliClient<HasToken>> {
     const result = await loginByTvQrcode(this.config, options);
     if (!result.success) throw new AuthRequiredError(result.message);
+    await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
   }
 
@@ -226,7 +246,15 @@ export class BiliClient<T = void> {
   ): Promise<BiliClient<HasToken>> {
     const result = await loginByPassword(this.config, username, password, options);
     if (!result.success) throw new AuthRequiredError(result.message);
+    await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
+  }
+
+  private async ensureProfileCreated(): Promise<void> {
+    const userId = this.config.extractUserId();
+    if (userId) {
+      await this.config.createProfileForUser(userId);
+    }
   }
 
   /** 退出登录 — 返回未认证客户端 */
