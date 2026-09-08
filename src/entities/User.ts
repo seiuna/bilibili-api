@@ -1,6 +1,16 @@
 import { BaseEntity } from './BaseEntity.js';
-import type { UserInfo, UserStat, UpStat, NavNum, MedalWallData } from '../api/user.js';
+import type {
+  UserInfo,
+  UserStat,
+  UpStat,
+  NavNum,
+  MedalWallData,
+  RelationListData,
+  RelationInfo,
+} from '../api/user.js';
 import { UserAPI } from '../api/user.js';
+import type { DynamicSpaceData, DynamicFeedItem } from '../api/dynamic.js';
+import { DynamicAPI } from '../api/dynamic.js';
 
 export class User extends BaseEntity<UserInfo> {
   get mid(): number { return this.rawData.mid; }
@@ -74,5 +84,27 @@ export class User extends BaseEntity<UserInfo> {
   /** 老粉计划发送留言 */
   async addContractMessage(content: string): Promise<void> {
     await UserAPI.addContractMessage(this.client, this.mid, content);
+  }
+
+  /** 获取单页粉丝明细 */
+  async getFans(ps = 50, pn = 1): Promise<RelationListData> {
+    const res = await UserAPI.getFans(this.client, this.mid, ps, pn);
+    return res.data;
+  }
+
+  /** 粉丝翻页 — async generator */
+  async *fans(ps = 50): AsyncGenerator<RelationInfo> {
+    yield* UserAPI.fans(this.client, this.mid, ps);
+  }
+
+  /** 获取单页空间动态 */
+  async getDynamics(offset?: string): Promise<DynamicSpaceData> {
+    const res = await DynamicAPI.getSpace(this.client, this.mid, offset);
+    return res.data;
+  }
+
+  /** 空间动态翻页 — async generator */
+  async *dynamics(): AsyncGenerator<DynamicFeedItem> {
+    yield* DynamicAPI.space(this.client, this.mid);
   }
 }

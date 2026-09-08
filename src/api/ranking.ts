@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import type { RecommendVideo } from './video.js';
 
@@ -15,13 +15,32 @@ export interface PreciousVideosData {
 }
 
 export class RankingAPI {
-  /** 获取热门视频 */
+  /** 获取热门视频（单页） */
   static async getPopular(
     client: BiliClient<any>,
     pn = 1,
     ps = 20,
   ): Promise<BiliApiResponse<{ list: RecommendVideo[]; no_more: boolean }>> {
     return client.request(`https://api.bilibili.com/x/web-interface/popular?pn=${pn}&ps=${ps}`);
+  }
+
+  /** 获取热门视频列表 — async generator 翻页 */
+  static async *popular(
+    client: BiliClient<any>,
+    ps = 20,
+    maxPages?: number,
+  ): AsyncGenerator<RecommendVideo> {
+    let pn = 1;
+    while (true) {
+      if (maxPages !== undefined && pn > maxPages) break;
+      const res = await this.getPopular(client, pn, ps);
+      if (res.code !== 0 || !res.data?.list?.length) break;
+
+      for (const item of res.data.list) yield item;
+
+      if (res.data.no_more) break;
+      pn++;
+    }
   }
 
   /** 获取视频排行�?*/

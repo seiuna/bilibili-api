@@ -1,5 +1,5 @@
 import type { BiliApiResponse } from '../core/types.js';
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 
 export interface ArticleInfo {
   like: number;

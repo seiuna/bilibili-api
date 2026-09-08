@@ -32,7 +32,7 @@ export class Dynamic extends BaseEntity<DynamicDetail['item']> {
 
   /** 删除动态 */
   async delete(): Promise<void> {
-    await DynamicAPI.delete(this.client, Number(this.id));
+    await DynamicAPI.delete(this.client, this.id);
   }
 
   /** 设置置顶 */

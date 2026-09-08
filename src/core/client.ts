@@ -537,12 +537,25 @@ export class BiliClient<T = void> {
     return self.getUser(mid);
   }
 
-  /** 获取历史记录 — 需要登录 */
+  /** 获取历史记录 — 需要登录 (async generator 翻页) */
   async getHistory(
     this: RequireAuth<T> extends never ? never : this,
     ps = 20,
+    type: 'all' | 'archive' | 'live' | 'article' = 'all',
   ): Promise<AsyncGenerator<import('../api/history.js').HistoryItem>> {
-    return HistoryAPI.history(this, ps);
+    return HistoryAPI.history(this, ps, type);
+  }
+
+  /** 获取单页历史记录 — 需要登录（游标分页） */
+  async getHistoryPage(
+    this: RequireAuth<T> extends never ? never : this,
+    ps = 20,
+    type: 'all' | 'archive' | 'live' | 'article' = 'all',
+    max?: number,
+    viewAt?: number,
+  ): Promise<import('../api/history.js').HistoryData> {
+    const res = await HistoryAPI.getHistory(this, ps, type, max, viewAt);
+    return res.data;
   }
 
   /** 获取稍后再看列表 — 需要登录 */
@@ -551,6 +564,41 @@ export class BiliClient<T = void> {
   ): Promise<{ count: number; list: import('../api/history.js').ToViewVideo[] }> {
     const res = await HistoryAPI.getToViewList(this);
     return res.data;
+  }
+
+  /**
+   * 发布动态 — 需要登录
+   * 支持纯文本、富文本、@ 用户、图片（自动上传本地文件/二进制数据）、发起投票
+   */
+  async createDynamic(
+    this: RequireAuth<T> extends never ? never : this,
+    contentOrOptions: string | import('../api/dynamic.js').CreateDynamicOptions,
+  ): Promise<BiliApiResponse<import('../api/dynamic.js').CreateDynamicResult>> {
+    return DynamicAPI.create(this, contentOrOptions);
+  }
+
+  /**
+   * 发布动态并返回 Dynamic 实体 — 需要登录
+   */
+  async publishDynamic(
+    this: RequireAuth<T> extends never ? never : this,
+    contentOrOptions: string | import('../api/dynamic.js').CreateDynamicOptions,
+  ): Promise<Dynamic> {
+    const res = await DynamicAPI.create(this, contentOrOptions);
+    if (res.code !== 0) {
+      throw new BiliApiError(res.message || '发布动态失败', res.code);
+    }
+    return this.getDynamic(res.data.dyn_id_str);
+  }
+
+  /**
+   * 发起/创建投票 — 需要登录
+   */
+  async createVote(
+    this: RequireAuth<T> extends never ? never : this,
+    options: import('../api/dynamic.js').CreateVoteOptions,
+  ): Promise<BiliApiResponse<import('../api/dynamic.js').CreateVoteResult>> {
+    return DynamicAPI.createVote(this, options);
   }
 
   // ==========================================

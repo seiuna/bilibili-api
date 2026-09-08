@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface NoteInfo {
@@ -31,7 +31,7 @@ export interface NoteListItem {
 }
 
 export class NoteAPI {
-  /** 检查视频是否禁止笔�?*/
+  /** 检查视频是否禁止笔记?*/
   static async isForbid(
     client: BiliClient<any>,
     aid: number,
@@ -51,7 +51,7 @@ export class NoteAPI {
     );
   }
 
-  /** 获取视频的笔记列�?*/
+  /** 获取视频的笔记列表?*/
   static async getArchiveNotes(
     client: BiliClient<any>,
     oid: number,
@@ -63,7 +63,7 @@ export class NoteAPI {
     );
   }
 
-  /** 获取用户笔记列表 */
+  /** 获取用户笔记列表（单页） */
   static async getUserNotes(
     client: BiliClient<any>,
     ps = 10,
@@ -73,6 +73,28 @@ export class NoteAPI {
     return client.request(
       `https://api.bilibili.com/x/note/list?ps=${ps}&pn=${pn}&csrf=${csrf}`,
     );
+  }
+
+  /** 获取用户笔记列表 — async generator 翻页 */
+  static async *userNotes(
+    client: BiliClient<any>,
+    ps = 10,
+  ): AsyncGenerator<NoteListItem> {
+    let pn = 1;
+    let total: number | null = null;
+    while (true) {
+      const res = await this.getUserNotes(client, ps, pn);
+      if (res.code !== 0 || !res.data?.list?.length) break;
+
+      if (total === null && res.data.page?.total !== undefined) {
+        total = res.data.page.total;
+      }
+
+      for (const item of res.data.list) yield item;
+
+      if (total !== null && pn * ps >= total) break;
+      pn++;
+    }
   }
 
   /** 保存/创建笔记 */

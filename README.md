@@ -124,6 +124,7 @@ src/
 | `getLiveRoom(roomId)` | `LiveRoom` | 获取直播间 | 否 |
 | `getFavoriteFolder(mediaId)` | `FavoriteFolder` | 获取收藏夹 | 否 |
 | `getHistory()` | AsyncGenerator | 翻页获取历史记录 | **是** |
+| `getHistoryPage(ps, type, max, viewAt)` | `HistoryData` | 单页获取历史记录（游标分页） | **是** |
 | `getToViewList()` | `ToViewVideo[]` | 稍后再看列表 | **是** |
 
 ### 子 API — 通过 `client.video` / `client.user` / `client.comment` 等访问
@@ -251,6 +252,10 @@ for await (const page of area.list(ReplySort.TIME)) {
   }
   // page.hots — 热评
 }
+
+// 单页精准获取
+const singlePage = await area.getPage(1, ReplySort.TIME, 20);
+console.log(`总数: ${singlePage.data.page.acount}, 当前获取: ${singlePage.data.replies?.length}`);
 ```
 
 ### 发表 / 回复 / 带图
@@ -479,10 +484,58 @@ const list = await note.getUserNotes(authed);
 ```ts
 const dyn = client.dynamic;
 
-// 空间动态
+// 1. 发布纯文本动态
+const res1 = await authed.createDynamic('大家好，这是一条测试动态！');
+console.log('发布成功，动态 ID:', res1.data.dyn_id_str);
+
+// 2. 发布带 @用户 的动态
+await authed.createDynamic({
+  content: '欢迎关注 @哔哩哔哩弹幕网 和 @小助手 哦',
+  at: [
+    { name: '哔哩哔哩弹幕网', mid: 208259 },
+    { name: '小助手', mid: 99999 },
+  ],
+});
+
+// 3. 发布带图片的动态（支持本地文件路径、Buffer 二进制、网络图片或已上传对象）
+await authed.createDynamic({
+  content: '今天天气不错，分享两张照片~',
+  images: [
+    './photos/pic1.jpg', // 本地图片路径，自动上传至 B 站 BFS
+    './photos/pic2.png',
+  ],
+  closeComment: false, // 是否关闭评论区
+});
+
+// 4. 发起投票动态（自动创建投票卡片并关联到动态）
+await authed.createDynamic({
+  content: '大家更喜欢吃什么夜宵呢？',
+  vote: {
+    title: '深夜夜宵选择',
+    options: ['烧烤', '炸鸡', '小龙虾', '轻食水果'],
+    choiceCount: 1,      // 单选或多选
+    duration: 7 * 86400, // 持续时间（秒）
+  },
+});
+
+// 5. 组合发布（图文 + @ + 投票 + 精选评论控制）
+const dynEntity = await authed.publishDynamic({
+  content: '带图带投票全能动态测试 @朋友',
+  at: [{ name: '朋友', mid: 123456 }],
+  images: ['./cover.png'],
+  vote: {
+    title: '投票标题',
+    options: ['支持', '反对'],
+  },
+  upChooseComment: true, // 开启精选评论
+});
+// 返回 Dynamic 实体，可直接调用实体方法：
+await dynEntity.like(); // 点赞本条动态
+
+// 空间动态与列表
 const feed = await dyn.getSpace(authed, mid);
 
-// 动态操作
+// 动态管理
 await dyn.like(authed, dynIdStr);
 await dyn.delete(authed, dynamicId);
 await dyn.setTop(authed, dynStr);

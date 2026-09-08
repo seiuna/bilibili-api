@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface HistoryItem {
@@ -49,7 +49,23 @@ export interface ToViewVideo {
 }
 
 export class HistoryAPI {
-  /** 获取历史记录 �?async generator 翻页 */
+  /** 获取单页历史记录（游标分页） */
+  static async getHistory(
+    client: BiliClient<any>,
+    ps = 20,
+    type: 'all' | 'archive' | 'live' | 'article' = 'all',
+    max?: number,
+    viewAt?: number,
+  ): Promise<BiliApiResponse<HistoryData>> {
+    const params = new URLSearchParams({ ps: String(Math.min(ps, 30)), type });
+    if (max !== undefined) params.set('max', String(max));
+    if (viewAt !== undefined) params.set('view_at', String(viewAt));
+    return client.request<BiliApiResponse<HistoryData>>(
+      `https://api.bilibili.com/x/web-interface/history/cursor?${params}`,
+    );
+  }
+
+  /** 获取历史记录 — async generator 翻页 */
   static async *history(
     client: BiliClient<any>,
     ps = 20,
@@ -59,19 +75,12 @@ export class HistoryAPI {
     let viewAt: number | undefined;
 
     while (true) {
-      const params = new URLSearchParams({ ps: String(Math.min(ps, 30)), type });
-      if (max !== undefined) params.set('max', String(max));
-      if (viewAt !== undefined) params.set('view_at', String(viewAt));
-
-      const data = await client.request<BiliApiResponse<HistoryData>>(
-        `https://api.bilibili.com/x/web-interface/history/cursor?${params}`,
-      );
-
-      if (data.code !== 0 || !data.data.list?.length) break;
+      const data = await this.getHistory(client, ps, type, max, viewAt);
+      if (data.code !== 0 || !data.data?.list?.length) break;
 
       for (const item of data.data.list) yield item;
 
-      if (!data.data.cursor.max) break;
+      if (!data.data.cursor?.max) break;
       max = data.data.cursor.max;
       viewAt = data.data.cursor.view_at;
     }
