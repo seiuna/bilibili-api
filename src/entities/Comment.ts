@@ -32,6 +32,31 @@ export class Comment extends BaseEntity<ReplyEntry> {
   get replies(): ReplyEntry['replies'] { return this.rawData.replies; }
   get upAction(): ReplyEntry['up_action'] { return this.rawData.up_action; }
 
+  /** 获取上游业务类型代码（1: 视频, 11: 相簿/图文动态, 12: 专栏, 14: 音频, 17: 纯文字动态等） */
+  get upstreamType(): number {
+    return this.type;
+  }
+
+  /** 获取上游业务类型的文字描述 */
+  get upstreamTypeName(): string {
+    switch (this.type) {
+      case ReplyType.VIDEO:
+        return '视频稿件 (Video)';
+      case ReplyType.DYNAMIC:
+        return '相簿/图文动态 (Opus / Dynamic)';
+      case ReplyType.ARTICLE:
+        return '专栏文章 (Article)';
+      case ReplyType.AUDIO:
+        return '音频 (Audio)';
+      case ReplyType.ALBUM:
+        return '相簿 (Album)';
+      case 17:
+        return '纯文字动态 (Word Dynamic)';
+      default:
+        return `业务类型 (${this.type})`;
+    }
+  }
+
   /** 该评论所属评论区，使用原始 type */
   commentArea(): CommentArea {
     return new CommentArea(this.client, this._oid, this.type);

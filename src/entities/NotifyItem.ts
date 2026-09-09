@@ -68,6 +68,7 @@ export class AtNotifyItem extends BaseEntity<AtNotification> {
   get authorName(): string { return this.rawData.user.nickname; }
   get authorMid(): number { return this.rawData.user.mid; }
   get authorAvatar(): string { return this.rawData.user.avatar; }
+  get title(): string { return this.rawData.item.title; }
   get content(): string { return this.rawData.item.source_content; }
   get businessId(): number { return this.rawData.item.business_id; }
   get business(): string { return this.rawData.item.business; }

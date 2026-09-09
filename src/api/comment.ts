@@ -82,9 +82,40 @@ export interface ReplyContent {
   members?: unknown[];
 }
 
+/**
+ * 无法通过 oid: 反向查询出对应的视频/动态
+ */
 export interface ReplyEntry {
+  /**
+   * 评论 ID（Reply ID）
+   * 用于唯一标识一条评论
+   */
   rpid: number;
+
+  /**
+   * 评论区所属资源 ID
+   *
+   * 不同 type 下含义不同：
+   * - type = 1：视频 aid
+   * - type = 11：图文动态 doc_id
+   * - type = 12：专栏 cvid
+   * - type = 14：音频 auid
+   * - type = 17：动态 dynamic_id
+   */
   oid: number;
+
+  /**
+   * 评论区类型
+   *
+   * 常见值：
+   * - 1：视频
+   * - 11：图文动态
+   * - 12：专栏
+   * - 14：音频
+   * - 17：动态 / 转发动态
+   * - 22：漫画
+   * - 33：课程
+   */
   type: number;
   mid: number;
   root: number;
@@ -175,7 +206,7 @@ export class CommentAPI {
   static async getReplies(
     client: BiliClient<any>,
     oid: number,
-    replyType: number = 1,
+    replyType: number,
     sort: ReplySort = ReplySort.TIME,
     nohot: 0 | 1 = 0,
     pn: number = 1,
@@ -198,7 +229,7 @@ export class CommentAPI {
   static async *replies(
     client: BiliClient<any>,
     oid: number,
-    replyType: number = 1,
+    replyType: number,
     sort: ReplySort = ReplySort.TIME,
     nohot: 0 | 1 = 0,
     pageSize: number = 20,
@@ -229,7 +260,7 @@ export class CommentAPI {
   static async getRepliesWbi(
     client: BiliClient<any>,
     oid: number,
-    replyType: number = 1,
+    replyType: number,
     mode: ReplyMode = ReplyMode.HEAT,
     paginationStr?: string,
   ): Promise<BiliApiResponse<ReplyWbiMainData>> {
@@ -250,7 +281,7 @@ export class CommentAPI {
   static async *repliesWbi(
     client: BiliClient<any>,
     oid: number,
-    replyType: number = 1,
+    replyType: number,
     mode: ReplyMode = ReplyMode.HEAT,
   ): AsyncGenerator<{ cursor: number; comments: ReplyEntry[]; hots: ReplyEntry[] | null }> {
     let nextOffset = '';
@@ -278,7 +309,7 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rootRpid: number,
-    replyType: number = 1,
+    replyType: number,
     pn: number = 1,
     pageSize: number = 20,
   ): Promise<BiliApiResponse<ReplyMainData>> {
@@ -299,7 +330,7 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rootRpid: number,
-    replyType: number = 1,
+    replyType: number,
     pageSize: number = 20,
   ): AsyncGenerator<{ page: number; comments: ReplyEntry[] }> {
     let pn = 1;
@@ -326,7 +357,7 @@ export class CommentAPI {
   static async getHotReplies(
     client: BiliClient<any>,
     oid: number,
-    replyType: number = 1,
+    replyType: number,
     pn: number = 1,
     pageSize: number = 20,
   ): Promise<BiliApiResponse<ReplyMainData>> {
@@ -345,7 +376,7 @@ export class CommentAPI {
   static async *hotReplies(
     client: BiliClient<any>,
     oid: number,
-    replyType: number = 1,
+    replyType: number,
     pageSize: number = 20,
   ): AsyncGenerator<{ page: number; comments: ReplyEntry[] }> {
     let pn = 1;
@@ -372,10 +403,106 @@ export class CommentAPI {
   static async replyCount(
     client: BiliClient<any>,
     oid: number,
-    replyType: number = 1,
+    replyType: number,
   ): Promise<BiliApiResponse<{ count: number }>> {
     const params = new URLSearchParams({ type: String(replyType), oid: String(oid) });
     return client.request(`https://api.bilibili.com/x/v2/reply/count?${params}`);
+  }
+
+  /** 获取单条评论信息（通过 jump 定位接口） */
+  static async getReply(
+    client: BiliClient<any>,
+    oid: number,
+    replyType: number,
+    rpid: number | string,
+  ): Promise<BiliApiResponse<ReplyEntry>> {
+    const params = new URLSearchParams({
+      oid: String(oid),
+      type: String(replyType),
+      rpid: String(rpid),
+    });
+    const res = await client.request<BiliApiResponse<{ replies?: ReplyEntry[]; root?: ReplyEntry }>>(
+      `https://api.bilibili.com/x/v2/reply/jump?${params}`,
+    );
+
+    const target =
+      res.data?.replies?.find((r) => String(r.rpid) === String(rpid)) ??
+      (res.data?.root && String(res.data.root.rpid) === String(rpid) ? res.data.root : null);
+
+    return {
+      code: res.code,
+      message: res.message,
+      ttl: res.ttl,
+      data: target as ReplyEntry,
+    };
+  }
+
+  /**
+   * 尝试解析未知评论区归属的评论 rpid
+   * 可传入已知的 candidateSubjects，或自动从最近的消息通知 (@我的 / 回复我的) 中探测
+   */
+  static async resolveReply(
+    client: BiliClient<any>,
+    rpid: number | string,
+    candidateSubjects?: { oid: number; replyType: number }[],
+  ): Promise<{ reply: ReplyEntry; oid: number; replyType: number } | null> {
+    const rpidStr = String(rpid).trim();
+    const subjects: { oid: number; replyType: number }[] = candidateSubjects ? [...candidateSubjects] : [];
+
+    if (subjects.length === 0) {
+      try {
+        const { MessageAPI } = await import('./message.js');
+        const [atRes, replyRes] = await Promise.allSettled([
+          MessageAPI.getAtFeed(client),
+          MessageAPI.getReplyFeed(client),
+        ]);
+
+        if (atRes.status === 'fulfilled' && atRes.value.data?.items) {
+          for (const it of atRes.value.data.items) {
+            if (it.item?.subject_id && it.item?.business_id) {
+              subjects.push({ oid: it.item.subject_id, replyType: it.item.business_id });
+            }
+          }
+        }
+
+        if (replyRes.status === 'fulfilled' && replyRes.value.data?.items) {
+          for (const it of replyRes.value.data.items) {
+            if (it.item?.subject_id && it.item?.business_id) {
+              subjects.push({ oid: it.item.subject_id, replyType: it.item.business_id });
+            }
+          }
+        }
+      } catch {
+        // ignore feed lookup errors
+      }
+    }
+
+    const unique: { oid: number; replyType: number }[] = [];
+    const seen = new Set<string>();
+    for (const s of subjects) {
+      const key = `${s.oid}_${s.replyType}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(s);
+      }
+    }
+
+    for (const s of unique) {
+      try {
+        const res = await this.getReply(client, s.oid, s.replyType, rpidStr);
+        if (res.data && String(res.data.rpid) === rpidStr) {
+          return {
+            reply: res.data,
+            oid: s.oid,
+            replyType: s.replyType,
+          };
+        }
+      } catch {
+        // continue trying
+      }
+    }
+
+    return null;
   }
 
   /** 发表评论 */
@@ -383,7 +510,7 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     message: string,
-    replyType: number = 1,
+    replyType: number,
     root = 0,
     parent = 0,
     plat = 1,
@@ -411,8 +538,8 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rpid: number,
+    replyType: number,
     action: ReplyAction = ReplyAction.LIKE,
-    replyType: number = 1,
   ): Promise<BiliApiResponse<null>> {
     const csrf = client.config.getCsrf();
     return client.request('https://api.bilibili.com/x/v2/reply/action', {
@@ -430,8 +557,8 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rpid: number,
+    replyType: number,
     action: ReplyHateAction = ReplyHateAction.HATE,
-    replyType: number = 1,
   ): Promise<BiliApiResponse<null>> {
     const csrf = client.config.getCsrf();
     return client.request('https://api.bilibili.com/x/v2/reply/hate', {
@@ -449,7 +576,7 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rpid: number,
-    replyType: number = 1,
+    replyType: number,
   ): Promise<BiliApiResponse<null>> {
     const csrf = client.config.getCsrf();
     return client.request('https://api.bilibili.com/x/v2/reply/del', {
@@ -467,8 +594,8 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rpid: number,
+    replyType: number,
     action: ReplyTopAction = ReplyTopAction.TOP,
-    replyType: number = 1,
   ): Promise<BiliApiResponse<null>> {
     const csrf = client.config.getCsrf();
     return client.request('https://api.bilibili.com/x/v2/reply/top', {
@@ -486,8 +613,8 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rpid: number,
+    replyType: number,
     reason: ReplyReportReason = ReplyReportReason.SPAM,
-    replyType: number = 1,
     content?: string,
   ): Promise<BiliApiResponse<null>> {
     const csrf = client.config.getCsrf();
