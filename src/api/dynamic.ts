@@ -218,7 +218,7 @@ function buildDynamicContents(
 }
 
 export class DynamicAPI {
-  /** 获取动态详�?*/
+  /** 获取动态详情*/
   static async getDetail(client: BiliClient<any>, id: string): Promise<BiliApiResponse<DynamicDetail>> {
     const features = 'itemOpusStyle,listOnlyfans,opusBigCover,onlyfansVote';
     return client.request(

@@ -106,6 +106,27 @@ export interface RequestInit {
   wbi?: boolean;
   /** 是否自动检查 code（非 0 抛异常） */
   checked?: boolean;
+  /**
+   * 是否匿名请求（禁止附带 Cookie/Authorization 凭证，且不合并响应中的 Set-Cookie 到本地配置）
+   * 对非 B 站域名的外部下载/请求默认自动启用匿名模式，防止向第三方凭据泄露或配置被污染
+   */
+  anonymous?: boolean;
+}
+
+function isBilibiliHost(urlStr: string): boolean {
+  try {
+    const hostname = new URL(urlStr).hostname.toLowerCase();
+    return (
+      hostname === 'bilibili.com' || hostname.endsWith('.bilibili.com') ||
+      hostname === 'hdslb.com' || hostname.endsWith('.hdslb.com') ||
+      hostname === 'bilibili.tv' || hostname.endsWith('.bilibili.tv') ||
+      hostname === 'biliapi.net' || hostname.endsWith('.biliapi.net') ||
+      hostname === 'biliapi.com' || hostname.endsWith('.biliapi.com') ||
+      hostname === 'acg.tv' || hostname.endsWith('.acg.tv')
+    );
+  } catch {
+    return false;
+  }
 }
 
 export class BiliClient<T = void> {
@@ -347,12 +368,15 @@ export class BiliClient<T = void> {
     url: string,
     options: RequestInit,
   ): Promise<Response> {
+    const isAnonymous = options.anonymous ?? (!isBilibiliHost(url));
     const headers = new Headers(options.headers);
-    if (this.config.data.cookie) {
-      headers.set('Cookie', this.config.data.cookie);
-    }
-    if (this.config.data.accessToken) {
-      headers.set('Authorization', `Bearer ${this.config.data.accessToken}`);
+    if (!isAnonymous) {
+      if (this.config.data.cookie) {
+        headers.set('Cookie', this.config.data.cookie);
+      }
+      if (this.config.data.accessToken) {
+        headers.set('Authorization', `Bearer ${this.config.data.accessToken}`);
+      }
     }
 
     const res = await fetcher(url, {
@@ -361,11 +385,13 @@ export class BiliClient<T = void> {
       body: options.body as BodyInit | undefined,
     });
 
-    const setCookies = typeof res.headers.getSetCookie === 'function'
-      ? res.headers.getSetCookie()
-      : (res.headers.get('set-cookie') ?? '');
-    if (Array.isArray(setCookies) ? setCookies.length > 0 : Boolean(setCookies)) {
-      await this.config.mergeCookie(setCookies);
+    if (!isAnonymous) {
+      const setCookies = typeof res.headers.getSetCookie === 'function'
+        ? res.headers.getSetCookie()
+        : (res.headers.get('set-cookie') ?? '');
+      if (Array.isArray(setCookies) ? setCookies.length > 0 : Boolean(setCookies)) {
+        await this.config.mergeCookie(setCookies);
+      }
     }
 
     return res;
@@ -489,6 +515,48 @@ export class BiliClient<T = void> {
   async getOpus(id: number | string): Promise<Opus> {
     const rawData = await OpusAPI.getDetail(this, id);
     return new Opus(this, rawData.data.item);
+  }
+
+  /**
+   * 获取单条评论实体
+   * @param oid 评论区主体 ID (如视频 avid、相簿 id)
+   * @param replyType 评论区业务类型代码 (1: 视频, 11: 动态/相簿, 12: 专栏, ...)
+   * @param rpid 评论 ID
+   */
+  async getComment(
+    oid: number,
+    replyType: number,
+    rpid: number | string,
+  ): Promise<import('../entities/Comment.js').Comment> {
+    const res = await CommentAPI.getReply(this, oid, replyType, rpid);
+    if (!res.data) {
+      throw new BiliApiError(`评论 ${rpid} 不存在或未找到`, res.code || -404);
+    }
+    const { Comment } = await import('../entities/Comment.js');
+    return new Comment(this, res.data, oid);
+  }
+
+  /**
+   * 根据评论 rpid 自动探测并获取评论实体
+   * 若未提供 oid 和 replyType，会自动从候选评论区及账号最近通知中反查定位
+   */
+  async resolveComment(
+    rpid: number | string,
+    hint?: { oid?: number; replyType?: number },
+  ): Promise<import('../entities/Comment.js').Comment> {
+    if (hint?.oid !== undefined && hint?.replyType !== undefined) {
+      return this.getComment(hint.oid, hint.replyType, rpid);
+    }
+    const resolved = await CommentAPI.resolveReply(
+      this,
+      rpid,
+      hint?.oid && hint?.replyType ? [{ oid: hint.oid, replyType: hint.replyType }] : undefined,
+    );
+    if (!resolved) {
+      throw new BiliApiError(`无法自动定位评论 ${rpid} 的上游评论区`, -404);
+    }
+    const { Comment } = await import('../entities/Comment.js');
+    return new Comment(this, resolved.reply, resolved.oid);
   }
 
   // ==========================================

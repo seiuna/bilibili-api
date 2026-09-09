@@ -47,7 +47,7 @@ export class UploadAPI {
     url: string,
     filename?: string,
   ): Promise<BiliApiResponse<UploadImageResult>> {
-    const res = await client.rawRequest(url);
+    const res = await client.rawRequest(url, { anonymous: true });
     if (!res.ok) throw new Error(`下载图片失败: HTTP ${res.status}`);
 
     const buffer = Buffer.from(await res.arrayBuffer());

@@ -65,6 +65,14 @@ export class CommentArea {
     yield* CommentAPI.repliesWbi(this.client, this.oid, this.replyType, mode);
   }
 
+  /** 获取单条评论实体 */
+  async getReply(rpid: number | string): Promise<import('./Comment.js').Comment | null> {
+    const res = await CommentAPI.getReply(this.client, this.oid, this.replyType, rpid);
+    if (!res.data) return null;
+    const { Comment } = await import('./Comment.js');
+    return new Comment(this.client, res.data, this.oid);
+  }
+
   /** 发表评论（支持图片） */
   async add(
     message: string,
@@ -106,18 +114,16 @@ export class CommentArea {
   /** 点赞 / 取消 */
   async like(rpid: number, unlike = false): Promise<BiliApiResponse<null>> {
     return CommentAPI.like(
-      this.client, this.oid, rpid,
+      this.client, this.oid, rpid, this.replyType,
       unlike ? ReplyAction.UNLIKE : ReplyAction.LIKE,
-      this.replyType,
     );
   }
 
   /** 点踩 / 取消 */
   async hate(rpid: number, unhate = false): Promise<BiliApiResponse<null>> {
     return CommentAPI.hate(
-      this.client, this.oid, rpid,
+      this.client, this.oid, rpid, this.replyType,
       unhate ? ReplyHateAction.UNHATE : ReplyHateAction.HATE,
-      this.replyType,
     );
   }
 
@@ -129,9 +135,8 @@ export class CommentArea {
   /** 置顶 / 取消 */
   async top(rpid: number, untop = false): Promise<BiliApiResponse<null>> {
     return CommentAPI.top(
-      this.client, this.oid, rpid,
+      this.client, this.oid, rpid, this.replyType,
       untop ? ReplyTopAction.UNTOP : ReplyTopAction.TOP,
-      this.replyType,
     );
   }
 
@@ -141,7 +146,7 @@ export class CommentArea {
     reason: ReplyReportReason = ReplyReportReason.SPAM,
     content?: string,
   ): Promise<BiliApiResponse<null>> {
-    return CommentAPI.report(this.client, this.oid, rpid, reason, this.replyType, content);
+    return CommentAPI.report(this.client, this.oid, rpid, this.replyType, reason, content);
   }
 
   /** 评论总数 */
