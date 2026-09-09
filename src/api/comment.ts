@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export enum ReplyType {
@@ -171,7 +171,30 @@ export interface ReplyPage {
 // ---- API 方法 ----
 
 export class CommentAPI {
-  /** 获取评论区明�?�?async generator 逐页 yield */
+  /** 获取评论区单页明细 */
+  static async getReplies(
+    client: BiliClient<any>,
+    oid: number,
+    replyType: number = 1,
+    sort: ReplySort = ReplySort.TIME,
+    nohot: 0 | 1 = 0,
+    pn: number = 1,
+    pageSize: number = 20,
+  ): Promise<BiliApiResponse<ReplyMainData>> {
+    const params = new URLSearchParams({
+      type: String(replyType),
+      oid: String(oid),
+      sort: String(sort),
+      nohot: String(nohot),
+      ps: String(Math.min(pageSize, 20)),
+      pn: String(pn),
+    });
+    return client.request<BiliApiResponse<ReplyMainData>>(
+      `https://api.bilibili.com/x/v2/reply?${params}`,
+    );
+  }
+
+  /** 获取评论区明细 — async generator 逐页 yield */
   static async *replies(
     client: BiliClient<any>,
     oid: number,
@@ -184,23 +207,11 @@ export class CommentAPI {
     let totalPages: number | null = null;
 
     while (true) {
-      const params = new URLSearchParams({
-        type: String(replyType),
-        oid: String(oid),
-        sort: String(sort),
-        nohot: String(nohot),
-        ps: String(Math.min(pageSize, 20)),
-        pn: String(pn),
-      });
-
-      const data = await client.request<BiliApiResponse<ReplyMainData>>(
-        `https://api.bilibili.com/x/v2/reply?${params}`,
-      );
-
-      if (data.code !== 0) break;
+      const data = await this.getReplies(client, oid, replyType, sort, nohot, pn, pageSize);
+      if (data.code !== 0 || !data.data) break;
 
       const page = data.data.page;
-      if (totalPages === null) {
+      if (totalPages === null && page) {
         totalPages = Math.ceil(page.acount / page.size);
       }
 
@@ -214,7 +225,28 @@ export class CommentAPI {
     }
   }
 
-  /** 懒加载翻页（WBI 接口�?*/
+  /** 获取评论区单页明细（WBI 接口） */
+  static async getRepliesWbi(
+    client: BiliClient<any>,
+    oid: number,
+    replyType: number = 1,
+    mode: ReplyMode = ReplyMode.HEAT,
+    paginationStr?: string,
+  ): Promise<BiliApiResponse<ReplyWbiMainData>> {
+    const params = new URLSearchParams({
+      type: String(replyType),
+      oid: String(oid),
+      mode: String(mode),
+    });
+    if (paginationStr) {
+      params.set('pagination_str', paginationStr);
+    }
+    return client.request<BiliApiResponse<ReplyWbiMainData>>(
+      `https://api.bilibili.com/x/v2/reply/main?${params}`,
+    );
+  }
+
+  /** 懒加载翻页（WBI 接口） — async generator */
   static async *repliesWbi(
     client: BiliClient<any>,
     oid: number,
@@ -225,20 +257,9 @@ export class CommentAPI {
     let isEnd = false;
 
     while (!isEnd) {
-      const params = new URLSearchParams({
-        type: String(replyType),
-        oid: String(oid),
-        mode: String(mode),
-      });
-      if (nextOffset) {
-        params.set('pagination_str', JSON.stringify({ offset: nextOffset }));
-      }
-
-      const data = await client.request<BiliApiResponse<ReplyWbiMainData>>(
-        `https://api.bilibili.com/x/v2/reply/main?${params}`,
-      );
-
-      if (data.code !== 0) break;
+      const paginationStr = nextOffset ? JSON.stringify({ offset: nextOffset }) : undefined;
+      const data = await this.getRepliesWbi(client, oid, replyType, mode, paginationStr);
+      if (data.code !== 0 || !data.data) break;
 
       const { cursor, replies } = data.data;
       const comments = replies ?? [];
@@ -247,11 +268,33 @@ export class CommentAPI {
       if (comments.length) yield { cursor: cursor.next, comments, hots };
 
       isEnd = cursor.is_end;
-      nextOffset = cursor.pagination_reply.next_offset;
+      nextOffset = cursor.pagination_reply?.next_offset ?? '';
+      if (!nextOffset) break;
     }
   }
 
-  /** 获取指定评论的回复列表（楼中楼） */
+  /** 获取指定评论单页回复列表（楼中楼） */
+  static async getReplyDialog(
+    client: BiliClient<any>,
+    oid: number,
+    rootRpid: number,
+    replyType: number = 1,
+    pn: number = 1,
+    pageSize: number = 20,
+  ): Promise<BiliApiResponse<ReplyMainData>> {
+    const params = new URLSearchParams({
+      type: String(replyType),
+      oid: String(oid),
+      root: String(rootRpid),
+      ps: String(Math.min(pageSize, 49)),
+      pn: String(pn),
+    });
+    return client.request<BiliApiResponse<ReplyMainData>>(
+      `https://api.bilibili.com/x/v2/reply/reply?${params}`,
+    );
+  }
+
+  /** 获取指定评论的回复列表（楼中楼） — async generator */
   static async *replyDialog(
     client: BiliClient<any>,
     oid: number,
@@ -263,19 +306,8 @@ export class CommentAPI {
     let totalPages: number | null = null;
 
     while (true) {
-      const params = new URLSearchParams({
-        type: String(replyType),
-        oid: String(oid),
-        root: String(rootRpid),
-        ps: String(Math.min(pageSize, 49)),
-        pn: String(pn),
-      });
-
-      const data = await client.request<BiliApiResponse<ReplyMainData>>(
-        `https://api.bilibili.com/x/v2/reply/reply?${params}`,
-      );
-
-      if (data.code !== 0) break;
+      const data = await this.getReplyDialog(client, oid, rootRpid, replyType, pn, pageSize);
+      if (data.code !== 0 || !data.data) break;
 
       const page = data.data.page;
       if (totalPages === null && page) {
@@ -283,7 +315,6 @@ export class CommentAPI {
       }
 
       const comments = data.data.replies ?? [];
-
       if (comments.length) yield { page: pn, comments };
 
       if (pn >= (totalPages ?? 1) || !comments.length) break;
@@ -291,7 +322,26 @@ export class CommentAPI {
     }
   }
 
-  /** 获取热评列表 */
+  /** 获取热评单页列表 */
+  static async getHotReplies(
+    client: BiliClient<any>,
+    oid: number,
+    replyType: number = 1,
+    pn: number = 1,
+    pageSize: number = 20,
+  ): Promise<BiliApiResponse<ReplyMainData>> {
+    const params = new URLSearchParams({
+      type: String(replyType),
+      oid: String(oid),
+      ps: String(Math.min(pageSize, 49)),
+      pn: String(pn),
+    });
+    return client.request<BiliApiResponse<ReplyMainData>>(
+      `https://api.bilibili.com/x/v2/reply/hot?${params}`,
+    );
+  }
+
+  /** 获取热评列表 — async generator */
   static async *hotReplies(
     client: BiliClient<any>,
     oid: number,
@@ -302,17 +352,7 @@ export class CommentAPI {
     let totalPages: number | null = null;
 
     while (true) {
-      const params = new URLSearchParams({
-        type: String(replyType),
-        oid: String(oid),
-        ps: String(Math.min(pageSize, 49)),
-        pn: String(pn),
-      });
-
-      const data = await client.request<BiliApiResponse<ReplyMainData>>(
-        `https://api.bilibili.com/x/v2/reply/hot?${params}`,
-      );
-
+      const data = await this.getHotReplies(client, oid, replyType, pn, pageSize);
       if (data.code !== 0 || !data.data) break;
 
       const page = data.data.page;
@@ -321,7 +361,6 @@ export class CommentAPI {
       }
 
       const comments = data.data.replies ?? [];
-
       if (comments.length) yield { page: pn, comments };
 
       if (pn >= (totalPages ?? 1) || !comments.length) break;

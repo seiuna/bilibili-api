@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface FavoriteFolder {
@@ -78,6 +78,7 @@ export class FavoriteAPI {
   }
 
   /** 获取收藏夹内容列�?*/
+  /** 获取收藏夹内容列表（单页） */
   static async getFolderList(
     client: BiliClient<any>,
     mediaId: number,
@@ -87,6 +88,24 @@ export class FavoriteAPI {
     return client.request(
       `https://api.bilibili.com/x/v3/fav/resource/list?media_id=${mediaId}&ps=${ps}&pn=${pn}`,
     );
+  }
+
+  /** 获取收藏夹内容列表 — async generator 翻页 */
+  static async *folderList(
+    client: BiliClient<any>,
+    mediaId: number,
+    ps = 20,
+  ): AsyncGenerator<FavoriteMedia> {
+    let pn = 1;
+    while (true) {
+      const res = await this.getFolderList(client, mediaId, ps, pn);
+      if (res.code !== 0 || !res.data?.medias?.length) break;
+
+      for (const item of res.data.medias) yield item;
+
+      if (!res.data.has_more) break;
+      pn++;
+    }
   }
 
   /** 新建收藏�?*/

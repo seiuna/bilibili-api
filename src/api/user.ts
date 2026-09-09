@@ -382,7 +382,7 @@ export class UserAPI {
     );
   }
 
-  /** 查询用户粉丝明细 */
+  /** 查询用户粉丝明细（单页） */
   static async getFans(
     client: BiliClient<any>,
     vmid: number,
@@ -392,6 +392,30 @@ export class UserAPI {
     return client.request(
       `https://api.bilibili.com/x/relation/fans?vmid=${vmid}&ps=${ps}&pn=${pn}`,
     );
+  }
+
+  /** 获取用户粉丝明细 — async generator 翻页 */
+  static async *fans(
+    client: BiliClient<any>,
+    vmid: number,
+    ps = 50,
+  ): AsyncGenerator<RelationInfo> {
+    let pn = 1;
+    let total: number | null = null;
+
+    while (true) {
+      const res = await this.getFans(client, vmid, ps, pn);
+      if (res.code !== 0 || !res.data?.list?.length) break;
+
+      if (total === null && res.data.total !== undefined) {
+        total = res.data.total;
+      }
+
+      for (const item of res.data.list) yield item;
+
+      if (total !== null && pn * ps >= total) break;
+      pn++;
+    }
   }
 
   /** 用户关系操作（关�?取关等） */

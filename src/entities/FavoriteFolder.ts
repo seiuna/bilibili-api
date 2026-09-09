@@ -13,10 +13,15 @@ export class FavoriteFolder extends BaseEntity<FavoriteFolderData> {
   get cntInfo(): FavoriteFolderData['cnt_info'] { return this.rawData.cnt_info; }
   get upper(): FavoriteFolderData['upper'] { return this.rawData.upper; }
 
-  /** 获取收藏夹内容列表 */
+  /** 获取收藏夹内容列表（单页） */
   async getMedias(ps = 20, pn = 1): Promise<{ medias: FavoriteMedia[] | null; hasMore: boolean }> {
     const res = await FavoriteAPI.getFolderList(this.client, this.id, ps, pn);
     return { medias: res.data.medias, hasMore: res.data.has_more };
+  }
+
+  /** 收藏夹内容翻页 — async generator */
+  async *medias(ps = 20): AsyncGenerator<FavoriteMedia> {
+    yield* FavoriteAPI.folderList(this.client, this.id, ps);
   }
 
   /** 修改收藏夹 */

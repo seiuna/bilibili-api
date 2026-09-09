@@ -98,7 +98,19 @@ export { ArticleAPI } from './api/article.js';
 export type { ArticleInfo, ArticleView, ArticleCollection } from './api/article.js';
 
 export { DynamicAPI } from './api/dynamic.js';
-export type { DynamicDetail, DynamicSpaceData, DynamicFeedItem } from './api/dynamic.js';
+export type {
+  DynamicDetail,
+  DynamicSpaceData,
+  DynamicFeedItem,
+  VoteOptionItem,
+  CreateVoteOptions,
+  CreateVoteResult,
+  DynamicPicture,
+  DynamicAtUser,
+  DynamicRichTextNode,
+  CreateDynamicOptions,
+  CreateDynamicResult,
+} from './api/dynamic.js';
 
 export { MessageAPI } from './api/message.js';
 export type {

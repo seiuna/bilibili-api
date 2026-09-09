@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface ChargeListItem {
@@ -88,7 +88,7 @@ export class ElectricAPI {
     });
   }
 
-  /** 查询收到的充电留言列表 */
+  /** 查询收到的充电留言列表（单页） */
   static async getChargeRemarks(
     client: BiliClient<any>,
     pn = 1,
@@ -97,6 +97,28 @@ export class ElectricAPI {
     return client.request(
       `https://member.bilibili.com/x/web/elec/remark/list?pn=${pn}&ps=${ps}`,
     );
+  }
+
+  /** 查询收到的充电留言列表 — async generator 翻页 */
+  static async *chargeRemarks(
+    client: BiliClient<any>,
+    ps = 10,
+  ): AsyncGenerator<ChargeRemarkItem> {
+    let pn = 1;
+    let total: number | null = null;
+    while (true) {
+      const res = await this.getChargeRemarks(client, pn, ps);
+      if (res.code !== 0 || !res.data?.list?.length) break;
+
+      if (total === null && res.data.pager?.total !== undefined) {
+        total = res.data.pager.total;
+      }
+
+      for (const item of res.data.list) yield item;
+
+      if (total !== null && pn * ps >= total) break;
+      pn++;
+    }
   }
 
   /** 查询充电留言详情 */

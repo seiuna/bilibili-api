@@ -1,5 +1,11 @@
 import type { BiliApiResponse } from '../core/types.js';
-import type { ReplyEntry, ReplyAddResult, ReplyPage } from '../api/comment.js';
+import type {
+  ReplyEntry,
+  ReplyAddResult,
+  ReplyPage,
+  ReplyMainData,
+  ReplyWbiMainData,
+} from '../api/comment.js';
 import {
   ReplySort,
   ReplyMode,
@@ -10,7 +16,7 @@ import {
   CommentAPI,
 } from '../api/comment.js';
 import type { UploadImageResult } from '../api/upload.js';
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 
 /**
  * 绑定到具体评论区 (oid + replyType) 的高层封装
@@ -24,6 +30,24 @@ export class CommentArea {
 
   get getOid(): number { return this.oid; }
   get getReplyType(): number { return this.replyType; }
+
+  /** 获取单页评论 */
+  async getPage(
+    pn = 1,
+    sort: ReplySort = ReplySort.TIME,
+    pageSize = 20,
+    nohot: 0 | 1 = 0,
+  ): Promise<BiliApiResponse<ReplyMainData>> {
+    return CommentAPI.getReplies(this.client, this.oid, this.replyType, sort, nohot, pn, pageSize);
+  }
+
+  /** 获取单页评论（WBI 接口） */
+  async getPageWbi(
+    mode: ReplyMode = ReplyMode.HEAT,
+    paginationStr?: string,
+  ): Promise<BiliApiResponse<ReplyWbiMainData>> {
+    return CommentAPI.getRepliesWbi(this.client, this.oid, this.replyType, mode, paginationStr);
+  }
 
   /** 评论区翻页 — async generator */
   async *list(

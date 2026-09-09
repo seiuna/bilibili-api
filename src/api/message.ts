@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 // ---- 枚举 ----
@@ -222,55 +222,69 @@ export class MessageAPI {
     return client.request('https://api.vc.bilibili.com/x/im/web/msgfeed/unread');
   }
 
-  /** 获取"回复我的"信息 �?async generator 翻页 */
+  /** 获取单页"回复我的"信息 */
+  static async getReplyFeed(
+    client: BiliClient<any>,
+    cursorId?: number,
+    cursorTime?: number,
+  ): Promise<BiliApiResponse<ReplyFeedData>> {
+    const params = new URLSearchParams();
+    if (cursorId && cursorId > 0) params.set('id', String(cursorId));
+    if (cursorTime && cursorTime > 0) params.set('reply_time', String(cursorTime));
+    return client.request<BiliApiResponse<ReplyFeedData>>(
+      `https://api.bilibili.com/x/msgfeed/reply?${params}`,
+    );
+  }
+
+  /** 获取"回复我的"信息 — async generator 翻页 */
   static async *replyFeed(client: BiliClient<any>): AsyncGenerator<ReplyNotification> {
     let cursorId = 0;
     let cursorTime = 0;
     let isEnd = false;
 
     while (!isEnd) {
-      const params = new URLSearchParams();
-      if (cursorId > 0) params.set('id', String(cursorId));
-      if (cursorTime > 0) params.set('reply_time', String(cursorTime));
-
-      const data = await client.request<BiliApiResponse<ReplyFeedData>>(
-        `https://api.bilibili.com/x/msgfeed/reply?${params}`,
-      );
-
-      if (data.code !== 0) break;
+      const data = await this.getReplyFeed(client, cursorId, cursorTime);
+      if (data.code !== 0 || !data.data?.items) break;
 
       for (const item of data.data.items) yield item;
 
-      isEnd = data.data.cursor.is_end;
-      cursorId = data.data.cursor.id;
-      cursorTime = data.data.cursor.time;
+      isEnd = data.data.cursor?.is_end ?? true;
+      cursorId = data.data.cursor?.id ?? 0;
+      cursorTime = data.data.cursor?.time ?? 0;
 
       if (data.data.items.length === 0) break;
     }
   }
 
-  /** 获取"@我的"信息 �?async generator 翻页 */
+  /** 获取单页"@我的"信息 */
+  static async getAtFeed(
+    client: BiliClient<any>,
+    cursorId?: number,
+    cursorTime?: number,
+  ): Promise<BiliApiResponse<AtFeedData>> {
+    const params = new URLSearchParams({ platform: 'web', build: '0', mobi_app: 'web' });
+    if (cursorId && cursorId > 0) params.set('id', String(cursorId));
+    if (cursorTime && cursorTime > 0) params.set('reply_time', String(cursorTime));
+    return client.request<BiliApiResponse<AtFeedData>>(
+      `https://api.bilibili.com/x/msgfeed/at?${params}`,
+    );
+  }
+
+  /** 获取"@我的"信息 — async generator 翻页 */
   static async *atFeed(client: BiliClient<any>): AsyncGenerator<AtNotification> {
     let cursorId = 0;
     let cursorTime = 0;
     let isEnd = false;
 
     while (!isEnd) {
-      const params = new URLSearchParams({ platform: 'web', build: '0', mobi_app: 'web' });
-      if (cursorId > 0) params.set('id', String(cursorId));
-      if (cursorTime > 0) params.set('reply_time', String(cursorTime));
-
-      const data = await client.request<BiliApiResponse<AtFeedData>>(
-        `https://api.bilibili.com/x/msgfeed/at?${params}`,
-      );
-
-      if (data.code !== 0) break;
+      const data = await this.getAtFeed(client, cursorId, cursorTime);
+      if (data.code !== 0 || !data.data?.items) break;
 
       for (const item of data.data.items) yield item;
 
-      isEnd = data.data.cursor.is_end;
-      cursorId = data.data.cursor.id;
-      cursorTime = data.data.cursor.time;
+      isEnd = data.data.cursor?.is_end ?? true;
+      cursorId = data.data.cursor?.id ?? 0;
+      cursorTime = data.data.cursor?.time ?? 0;
 
       if (data.data.items.length === 0) break;
     }
@@ -298,7 +312,29 @@ export class MessageAPI {
     return client.request('https://api.vc.bilibili.com/session_svr/v1/session_svr/my_group_unread?build=0&mobi_app=web');
   }
 
-  /** 获取指定类型会话列表 �?async generator */
+  /** 获取单页指定类型会话列表 */
+  static async getSessions(
+    client: BiliClient<any>,
+    sessionType: SessionQueryType = SessionQueryType.ALL,
+    size = 20,
+    beginTs?: number,
+    sortRule?: number,
+  ): Promise<BiliApiResponse<SessionListData>> {
+    const params = new URLSearchParams({
+      session_type: String(sessionType),
+      size: String(Math.min(size, 100)),
+      build: '0',
+      mobi_app: 'web',
+    });
+    if (beginTs && beginTs > 0) params.set('begin_ts', String(beginTs));
+    if (sortRule !== undefined) params.set('sort_rule', String(sortRule));
+
+    return client.request<BiliApiResponse<SessionListData>>(
+      `https://api.vc.bilibili.com/session_svr/v1/session_svr/get_sessions?${params}`,
+    );
+  }
+
+  /** 获取指定类型会话列表 — async generator */
   static async *sessions(
     client: BiliClient<any>,
     sessionType: SessionQueryType = SessionQueryType.ALL,
@@ -309,20 +345,8 @@ export class MessageAPI {
     let hasMore = true;
 
     while (hasMore) {
-      const params = new URLSearchParams({
-        session_type: String(sessionType),
-        size: String(Math.min(size, 100)),
-        build: '0',
-        mobi_app: 'web',
-      });
-      if (beginTs > 0) params.set('begin_ts', String(beginTs));
-      if (sortRule !== undefined) params.set('sort_rule', String(sortRule));
-
-      const data = await client.request<BiliApiResponse<SessionListData>>(
-        `https://api.vc.bilibili.com/session_svr/v1/session_svr/get_sessions?${params}`,
-      );
-
-      if (data.code !== 0 || !data.data.session_list?.length) break;
+      const data = await this.getSessions(client, sessionType, size, beginTs, sortRule);
+      if (data.code !== 0 || !data.data?.session_list?.length) break;
 
       yield { sessions: data.data.session_list, hasMore: data.data.has_more === 1 };
 
@@ -333,7 +357,25 @@ export class MessageAPI {
     }
   }
 
-  /** 获取新会话列�?*/
+  /** 获取单页新会话列表 */
+  static async getNewSessions(
+    client: BiliClient<any>,
+    beginTs: number,
+    size = 20,
+  ): Promise<BiliApiResponse<SessionListData>> {
+    const params = new URLSearchParams({
+      begin_ts: String(beginTs),
+      size: String(Math.min(size, 100)),
+      build: '0',
+      mobi_app: 'web',
+    });
+
+    return client.request<BiliApiResponse<SessionListData>>(
+      `https://api.vc.bilibili.com/session_svr/v1/session_svr/new_sessions?${params}`,
+    );
+  }
+
+  /** 获取新会话列表 — async generator */
   static async *newSessions(
     client: BiliClient<any>,
     beginTs: number,
@@ -343,18 +385,8 @@ export class MessageAPI {
     let hasMore = true;
 
     while (hasMore) {
-      const params = new URLSearchParams({
-        begin_ts: String(currentTs),
-        size: String(Math.min(size, 100)),
-        build: '0',
-        mobi_app: 'web',
-      });
-
-      const data = await client.request<BiliApiResponse<SessionListData>>(
-        `https://api.vc.bilibili.com/session_svr/v1/session_svr/new_sessions?${params}`,
-      );
-
-      if (data.code !== 0 || !data.data.session_list?.length) break;
+      const data = await this.getNewSessions(client, currentTs, size);
+      if (data.code !== 0 || !data.data?.session_list?.length) break;
 
       yield { sessions: data.data.session_list, hasMore: data.data.has_more === 1 };
 
