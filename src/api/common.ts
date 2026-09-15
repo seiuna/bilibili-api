@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 /** 获取当前时间戳（秒级�?*/

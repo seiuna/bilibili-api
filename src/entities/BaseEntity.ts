@@ -1,4 +1,4 @@
-import { BiliClient } from "..";
+import type { BiliClient } from '../core/client.js';
 
 export abstract class BaseEntity<T> {
   constructor(

@@ -1,6 +1,13 @@
 import type { BiliApiResponse } from '../core/types.js';
 import type { BiliClient } from '../core/client.js';
+import type { Article } from '../entities/Article.js';
+import type { ArticleViewEntity } from '../entities/ArticleViewEntity.js';
 
+/**
+ * 专栏基本信息原始数据
+ *
+ * 实体包装见 {@link Article}。
+ */
 export interface ArticleInfo {
   like: number;
   attention: boolean;
@@ -28,6 +35,11 @@ export interface ArticleInfo {
   in_list: boolean;
 }
 
+/**
+ * 专栏正文原始数据
+ *
+ * 实体包装见 {@link ArticleViewEntity}。
+ */
 export interface ArticleView {
   id: number;
   title: string;

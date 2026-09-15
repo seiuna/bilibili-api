@@ -1,13 +1,21 @@
 import { BaseEntity } from './BaseEntity.js';
-import type { ArticleInfo, ArticleView } from '../api/article.js';
+import type { ArticleInfo } from '../api/article.js';
 import { ArticleAPI } from '../api/article.js';
+import { UserAPI } from '../api/user.js';
 import { User } from './User.js';
+import { ArticleViewEntity } from './ArticleViewEntity.js';
 
+/**
+ * 专栏文章实体
+ *
+ * 原始数据类型见 {@link ArticleInfo}。
+ */
 export class Article extends BaseEntity<ArticleInfo> {
-  get id(): number { return this.rawData.type === 0 ? (this.rawData as any).pre + 1 : this.rawData.title.length > 0 ? 0 : 0; }
-
-  /** 获取专栏 cvid（从 rawData 中提取） */
+  /** 专栏 cvid（从 rawData 中提取） */
   get cvid(): number { return (this.rawData as any)._cvid ?? 0; }
+
+  /** 文章标识 —— 与 cvid 一致 */
+  get id(): number { return this.cvid; }
 
   get title(): string { return this.rawData.title; }
   get bannerUrl(): string { return this.rawData.banner_url; }
@@ -21,16 +29,16 @@ export class Article extends BaseEntity<ArticleInfo> {
   get imageUrls(): string[] { return this.rawData.image_urls; }
   get type(): number { return this.rawData.type; }
 
-  /** 获取专栏作者（返回 User 实体） */
+  /** 获取专栏作者 */
   async getAuthor(): Promise<User> {
-    const res = await import('../api/user.js').then(m => m.UserAPI.getInfo(this.client, this.authorMid));
+    const res = await UserAPI.getInfo(this.client, this.authorMid);
     return new User(this.client, res.data);
   }
 
-  /** 获取专栏内容 */
-  async getView(): Promise<ArticleView> {
+  /** 获取专栏正文内容 */
+  async getView(): Promise<ArticleViewEntity> {
     const res = await ArticleAPI.getView(this.client, this.cvid);
-    return res.data;
+    return new ArticleViewEntity(this.client, res.data);
   }
 
   /** 点赞专栏 */

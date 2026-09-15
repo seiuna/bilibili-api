@@ -1,7 +1,13 @@
 import { BaseEntity } from './BaseEntity.js';
-import type { LiveRoomInfo, MutedUserItem } from '../api/live.js';
+import type { LiveRoomInfo } from '../api/live.js';
 import { LiveAPI } from '../api/live.js';
+import { MutedListEntity } from './MutedListEntity.js';
 
+/**
+ * 直播间实体
+ *
+ * 原始数据类型见 {@link LiveRoomInfo}。
+ */
 export class LiveRoom extends BaseEntity<LiveRoomInfo> {
   get roomId(): number { return this.rawData.room_id; }
   get shortId(): number { return this.rawData.short_id; }
@@ -31,9 +37,9 @@ export class LiveRoom extends BaseEntity<LiveRoomInfo> {
   }
 
   /** 获取禁言用户列表 */
-  async getMutedList(ps = 1): Promise<{ data: MutedUserItem[]; total: number; total_page: number }> {
+  async getMutedList(ps = 1): Promise<MutedListEntity> {
     const res = await LiveAPI.getMutedList(this.client, this.roomId, ps);
-    return res.data;
+    return new MutedListEntity(this.client, res.data);
   }
 
   /** 解禁用户 */

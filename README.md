@@ -123,9 +123,23 @@ src/
 | `getOpus(id)` | `Opus` | 获取图文 | 否 |
 | `getLiveRoom(roomId)` | `LiveRoom` | 获取直播间 | 否 |
 | `getFavoriteFolder(mediaId)` | `FavoriteFolder` | 获取收藏夹 | 否 |
-| `getHistory()` | AsyncGenerator | 翻页获取历史记录 | **是** |
-| `getHistoryPage(ps, type, max, viewAt)` | `HistoryData` | 单页获取历史记录（游标分页） | **是** |
-| `getToViewList()` | `ToViewVideo[]` | 稍后再看列表 | **是** |
+| `getComment(oid, replyType, rpid)` | `Comment` | 获取单条评论 | 否 |
+| `resolveComment(rpid, hint?)` | `Comment` | 自动定位并获取评论 | 否 |
+| `getMyInfo()` | `MyInfoEntity` | 当前登录用户空间信息 | **是** |
+| `getNavInfo()` | `NavInfoEntity` | 导航栏用户信息 | **是** |
+| `getCurrentUser()` | `User` | 当前登录用户实体 | **是** |
+| `getHistory()` | AsyncGenerator\<`HistoryItemEntity`\> | 翻页获取历史记录 | **是** |
+| `getHistoryPage(ps, type, max, viewAt)` | `HistoryDataEntity` | 单页获取历史记录（游标分页） | **是** |
+| `getToViewList()` | `ToViewListEntity` | 稍后再看列表 | **是** |
+| `getAtFeedPage(cursorId?, cursorTime?)` | `AtFeedEntity` | 单页 "@我的" 通知 | **是** |
+| `getReplyFeedPage(cursorId?, cursorTime?)` | `ReplyFeedEntity` | 单页 "回复我的" 通知 | **是** |
+| `atFeed()` | AsyncGenerator\<`AtNotifyItem`\> | 翻页获取 "@我的" 通知 | **是** |
+| `replyFeed()` | AsyncGenerator\<`ReplyNotifyItem`\> | 翻页获取 "回复我的" 通知 | **是** |
+| `createDynamic(opts)` | `BiliApiResponse` | 发布动态（写操作，保留原始响应） | **是** |
+| `publishDynamic(opts)` | `Dynamic` | 发布动态并返回实体 | **是** |
+| `createVote(opts)` | `BiliApiResponse` | 发起投票（写操作，保留原始响应） | **是** |
+
+> **实体命名约定**：与资源同名的一级实体直接用资源名（`Video`、`User`、`Article`、`Dynamic`、`Opus`、`LiveRoom`、`FavoriteFolder`、`Comment`）；附属实体统一加 `Entity` 后缀以避免与同名 raw 类型冲突（如 `VideoStatEntity`、`HistoryDataEntity`）。底层 API 类（`VideoAPI` / `CommentAPI` 等）仍返回原始 `BiliApiResponse`。
 
 ### 子 API — 通过 `client.video` / `client.user` / `client.comment` 等访问
 

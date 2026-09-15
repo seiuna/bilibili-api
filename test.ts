@@ -245,7 +245,7 @@ async function main() {
         const subject = await fetchSubjectDetail({
           businessId: item.businessId,
           subjectId: item.subjectId,
-          uri: item.uri,
+          uri: item.uri.raw,
           title: item.title,
         });
 
@@ -261,7 +261,7 @@ async function main() {
         } else {
           log('ReplyNotify', `    - 主体内容: ${subject.title}`);
         }
-        log('ReplyNotify', `    - 主体跳转链接: ${item.uri}`);
+        log('ReplyNotify', `    - 主体跳转链接: ${item.uri.raw}`);
         console.log('------------------------------------------------------------');
       }
 
@@ -302,7 +302,7 @@ async function main() {
         const subject = await fetchSubjectDetail({
           businessId: item.businessId,
           subjectId: item.subjectId,
-          uri: item.uri,
+          uri: item.uri.raw,
           title: item.title,
         });
 
@@ -318,7 +318,7 @@ async function main() {
         } else {
           log('AtNotify', `    - 主体内容: ${subject.title}`);
         }
-        log('AtNotify', `    - 主体跳转链接: ${item.uri}`);
+        log('AtNotify', `    - 主体跳转链接: ${item.uri.raw}`);
         console.log('------------------------------------------------------------');
       }
 

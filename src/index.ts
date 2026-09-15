@@ -86,6 +86,7 @@ export type {
 } from './api/comment.js';
 export {
   ReplyType,
+  BusinessType,
   ReplySort,
   ReplyMode,
   ReplyAction,
@@ -117,6 +118,8 @@ export type {
   UnreadCount,
   ReplyNotification,
   AtNotification,
+  AtFeedData,
+  ReplyFeedData,
   ChatSession,
   ChatMessage,
   SessionListData,
@@ -139,7 +142,7 @@ export { HistoryAPI } from './api/history.js';
 export type { HistoryItem, HistoryData, ToViewVideo } from './api/history.js';
 
 export { FavoriteAPI } from './api/favorite.js';
-export type { FavoriteFolder as FavoriteFolderData, FavoriteMedia, FavoriteListData } from './api/favorite.js';
+export type { FavoriteFolderData, FavoriteMedia, FavoriteListData } from './api/favorite.js';
 
 export { DanmakuAPI } from './api/danmaku.js';
 export type { DanmakuConfig } from './api/danmaku.js';
@@ -171,13 +174,52 @@ export { getCurrentTimestamp, av2bv, bv2av, formatImageUrl, getImageAvgColor, ge
 
 // ---- Entity 层 ----
 export { BaseEntity } from './entities/BaseEntity.js';
+
+// 一级实体（与资源同名）
 export { Video } from './entities/Video.js';
 export { User } from './entities/User.js';
 export { Article } from './entities/Article.js';
 export { Dynamic } from './entities/Dynamic.js';
-export { CommentArea } from './entities/CommentArea.js';
-export { Comment } from './entities/Comment.js';
+export { Opus } from './entities/Opus.js';
 export { LiveRoom } from './entities/LiveRoom.js';
 export { FavoriteFolder } from './entities/FavoriteFolder.js';
-export { Opus } from './entities/Opus.js';
-export { ReplyNotifyItem, AtNotifyItem } from './entities/NotifyItem.js';
+export { Comment } from './entities/Comment.js';
+export { CommentArea } from './entities/CommentArea.js';
+export { NotifyURIHelper, ReplyNotifyItem, AtNotifyItem } from './entities/NotifyItem.js';
+
+// 附属实体（与 raw 类型区分，统一 Entity 后缀）
+export { VideoStatEntity } from './entities/VideoStatEntity.js';
+export { PlayUrlEntity } from './entities/PlayUrlEntity.js';
+export { OnlineCountEntity } from './entities/OnlineCountEntity.js';
+export { AiSummaryEntity } from './entities/AiSummaryEntity.js';
+export { VideoSnapshotEntity } from './entities/VideoSnapshotEntity.js';
+export { PbpEntity } from './entities/PbpEntity.js';
+export { VideoTagEntity } from './entities/VideoTagEntity.js';
+export { RecommendVideoEntity } from './entities/RecommendVideoEntity.js';
+
+export { MyInfoEntity } from './entities/MyInfoEntity.js';
+export { NavInfoEntity } from './entities/NavInfoEntity.js';
+export { UserStatEntity } from './entities/UserStatEntity.js';
+export { UpStatEntity } from './entities/UpStatEntity.js';
+export { NavNumEntity } from './entities/NavNumEntity.js';
+export { MedalWallEntity } from './entities/MedalWallEntity.js';
+export { MedalWallItemEntity } from './entities/MedalWallItemEntity.js';
+export { RelationListEntity } from './entities/RelationListEntity.js';
+export { RelationInfoEntity } from './entities/RelationInfoEntity.js';
+
+export { DynamicSpaceEntity } from './entities/DynamicSpaceEntity.js';
+export { DynamicFeedItemEntity } from './entities/DynamicFeedItemEntity.js';
+export { ArticleViewEntity } from './entities/ArticleViewEntity.js';
+export { MutedListEntity } from './entities/MutedListEntity.js';
+export type { MutedListData } from './entities/MutedListEntity.js';
+export { MutedUserEntity } from './entities/MutedUserEntity.js';
+export { FavoriteMediaEntity } from './entities/FavoriteMediaEntity.js';
+export { FavoriteMediaPageEntity } from './entities/FavoriteMediaPageEntity.js';
+export type { FavoriteMediaPageData } from './entities/FavoriteMediaPageEntity.js';
+export { HistoryItemEntity } from './entities/HistoryItemEntity.js';
+export { HistoryDataEntity } from './entities/HistoryDataEntity.js';
+export { ToViewVideoEntity } from './entities/ToViewVideoEntity.js';
+export { ToViewListEntity } from './entities/ToViewListEntity.js';
+export type { ToViewListData } from './entities/ToViewListEntity.js';
+export { AtFeedEntity } from './entities/AtFeedEntity.js';
+export { ReplyFeedEntity } from './entities/ReplyFeedEntity.js';

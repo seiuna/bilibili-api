@@ -1,23 +1,70 @@
 import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import { UploadAPI } from './upload.js';
+import type { Dynamic } from '../entities/Dynamic.js';
+import type { DynamicFeedItemEntity } from '../entities/DynamicFeedItemEntity.js';
+import type { DynamicSpaceEntity } from '../entities/DynamicSpaceEntity.js';
+
+/**
+ * 动态详情原始数据
+ *
+ * 实体包装见 {@link Dynamic}。
+ */
+export interface DynamicOpusPicture {
+  aigc?: unknown;
+  height: number;
+  live_url?: string | null;
+  size: number;
+  url: string;
+  width: number;
+}
+
+export interface DynamicModule {
+  module_author?: unknown;
+  module_dynamic?: {
+    additional?: unknown;
+    desc?: unknown;
+    major?: {
+      opus?: {
+        fold_action?: string[];
+        jump_url?: string;
+        pics?: DynamicOpusPicture[];
+        summary?: {
+          rich_text_nodes?: unknown[];
+          text: string;
+        };
+        title?: string | null;
+      };
+      type?: string;
+    };
+    topic?: unknown;
+  };
+  module_more?: unknown;
+  module_stat?: unknown;
+}
 
 export interface DynamicDetail {
   item: {
     basic: {
       comment_id_str: string;
       comment_type: number;
+      jump_url?: string;
       rid_str: string;
       title?: string;
-      uid: number;
+      uid?: number;
     };
     id_str: string;
-    modules: unknown[];
+    modules: DynamicModule | DynamicModule[];
     type: string;
     visible: boolean;
   };
 }
 
+/**
+ * 动态信息流条目原始数据
+ *
+ * 实体包装见 {@link DynamicFeedItemEntity}。
+ */
 export interface DynamicFeedItem {
   basic: {
     comment_id_str: string;
@@ -33,6 +80,11 @@ export interface DynamicFeedItem {
   };
 }
 
+/**
+ * 用户空间动态列表原始数据
+ *
+ * 实体包装见 {@link DynamicSpaceEntity}。
+ */
 export interface DynamicSpaceData {
   has_more: boolean;
   items: DynamicFeedItem[];

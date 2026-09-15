@@ -41,6 +41,15 @@ import { Dynamic } from '../entities/Dynamic.js';
 import { LiveRoom } from '../entities/LiveRoom.js';
 import { FavoriteFolder } from '../entities/FavoriteFolder.js';
 import { Opus } from '../entities/Opus.js';
+import { Comment } from '../entities/Comment.js';
+import { MyInfoEntity } from '../entities/MyInfoEntity.js';
+import { NavInfoEntity } from '../entities/NavInfoEntity.js';
+import { HistoryDataEntity } from '../entities/HistoryDataEntity.js';
+import { HistoryItemEntity } from '../entities/HistoryItemEntity.js';
+import { ToViewListEntity } from '../entities/ToViewListEntity.js';
+import { AtFeedEntity } from '../entities/AtFeedEntity.js';
+import { ReplyFeedEntity } from '../entities/ReplyFeedEntity.js';
+import { AtNotifyItem, ReplyNotifyItem } from '../entities/NotifyItem.js';
 
 // ==========================================
 // 认证状态标记类型
@@ -527,23 +536,25 @@ export class BiliClient<T = void> {
     oid: number,
     replyType: number,
     rpid: number | string,
-  ): Promise<import('../entities/Comment.js').Comment> {
+  ): Promise<Comment> {
     const res = await CommentAPI.getReply(this, oid, replyType, rpid);
     if (!res.data) {
       throw new BiliApiError(`评论 ${rpid} 不存在或未找到`, res.code || -404);
     }
-    const { Comment } = await import('../entities/Comment.js');
     return new Comment(this, res.data, oid);
   }
 
   /**
+   * @deprecated 这个可以用 但是不要用这个!
+   * 
+   * 
    * 根据评论 rpid 自动探测并获取评论实体
    * 若未提供 oid 和 replyType，会自动从候选评论区及账号最近通知中反查定位
    */
   async resolveComment(
     rpid: number | string,
     hint?: { oid?: number; replyType?: number },
-  ): Promise<import('../entities/Comment.js').Comment> {
+  ): Promise<Comment> {
     if (hint?.oid !== undefined && hint?.replyType !== undefined) {
       return this.getComment(hint.oid, hint.replyType, rpid);
     }
@@ -555,7 +566,6 @@ export class BiliClient<T = void> {
     if (!resolved) {
       throw new BiliApiError(`无法自动定位评论 ${rpid} 的上游评论区`, -404);
     }
-    const { Comment } = await import('../entities/Comment.js');
     return new Comment(this, resolved.reply, resolved.oid);
   }
 
@@ -566,17 +576,17 @@ export class BiliClient<T = void> {
   /** 获取当前登录用户空间详细信息 — 需要登录 */
   async getMyInfo(
     this: RequireAuth<T> extends never ? never : this,
-  ): Promise<import('../api/user.js').MyInfo> {
+  ): Promise<MyInfoEntity> {
     const res = await UserAPI.getMyInfo(this);
-    return res.data;
+    return new MyInfoEntity(this, res.data);
   }
 
   /** 获取登录基本信息（导航栏用户信息） — 需要登录 */
   async getNavInfo(
     this: RequireAuth<T> extends never ? never : this,
-  ): Promise<import('../api/user.js').NavInfo> {
+  ): Promise<NavInfoEntity> {
     const res = await UserAPI.getNavInfo(this);
-    return res.data;
+    return new NavInfoEntity(this, res.data);
   }
 
   /**
@@ -605,13 +615,19 @@ export class BiliClient<T = void> {
     return self.getUser(mid);
   }
 
-  /** 获取历史记录 — 需要登录 (async generator 翻页) */
+  /** 获取历史记录 — 需要登录 (async generator 翻页，逐项返回实体) */
   async getHistory(
     this: RequireAuth<T> extends never ? never : this,
     ps = 20,
     type: 'all' | 'archive' | 'live' | 'article' = 'all',
-  ): Promise<AsyncGenerator<import('../api/history.js').HistoryItem>> {
-    return HistoryAPI.history(this, ps, type);
+  ): Promise<AsyncGenerator<HistoryItemEntity>> {
+    const source = await HistoryAPI.history(this, ps, type);
+    const client = this as BiliClient<any>;
+    return (async function* () {
+      for await (const item of source) {
+        yield new HistoryItemEntity(client, item);
+      }
+    })();
   }
 
   /** 获取单页历史记录 — 需要登录（游标分页） */
@@ -621,17 +637,67 @@ export class BiliClient<T = void> {
     type: 'all' | 'archive' | 'live' | 'article' = 'all',
     max?: number,
     viewAt?: number,
-  ): Promise<import('../api/history.js').HistoryData> {
+  ): Promise<HistoryDataEntity> {
     const res = await HistoryAPI.getHistory(this, ps, type, max, viewAt);
-    return res.data;
+    return new HistoryDataEntity(this, res.data);
   }
 
   /** 获取稍后再看列表 — 需要登录 */
   async getToViewList(
     this: RequireAuth<T> extends never ? never : this,
-  ): Promise<{ count: number; list: import('../api/history.js').ToViewVideo[] }> {
+  ): Promise<ToViewListEntity> {
     const res = await HistoryAPI.getToViewList(this);
-    return res.data;
+    return new ToViewListEntity(this, res.data);
+  }
+
+  // ------------------------------------------
+  // 通知（@我的 / 回复我的）门面 — 需要登录
+  // ------------------------------------------
+
+  /** 获取单页 "@我的" 通知 — 需要登录 */
+  async getAtFeedPage(
+    this: RequireAuth<T> extends never ? never : this,
+    cursorId?: number,
+    cursorTime?: number,
+  ): Promise<AtFeedEntity> {
+    const res = await MessageAPI.getAtFeed(this as BiliClient<any>, cursorId, cursorTime);
+    return new AtFeedEntity(this, res.data);
+  }
+
+  /** 获取单页 "回复我的" 通知 — 需要登录 */
+  async getReplyFeedPage(
+    this: RequireAuth<T> extends never ? never : this,
+    cursorId?: number,
+    cursorTime?: number,
+  ): Promise<ReplyFeedEntity> {
+    const res = await MessageAPI.getReplyFeed(this as BiliClient<any>, cursorId, cursorTime);
+    return new ReplyFeedEntity(this, res.data);
+  }
+
+  /** "@我的" 通知翻页 — 需要登录，逐项返回 AtNotifyItem 实体 */
+  async atFeed(
+    this: RequireAuth<T> extends never ? never : this,
+  ): Promise<AsyncGenerator<AtNotifyItem>> {
+    const client = this as BiliClient<any>;
+    const source = await MessageAPI.atFeed(client);
+    return (async function* () {
+      for await (const item of source) {
+        yield new AtNotifyItem(client, item);
+      }
+    })();
+  }
+
+  /** "回复我的" 通知翻页 — 需要登录，逐项返回 ReplyNotifyItem 实体 */
+  async replyFeed(
+    this: RequireAuth<T> extends never ? never : this,
+  ): Promise<AsyncGenerator<ReplyNotifyItem>> {
+    const client = this as BiliClient<any>;
+    const source = await MessageAPI.replyFeed(client);
+    return (async function* () {
+      for await (const item of source) {
+        yield new ReplyNotifyItem(client, item);
+      }
+    })();
   }
 
   /**

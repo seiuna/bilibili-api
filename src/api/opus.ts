@@ -1,6 +1,12 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
+import type { Opus } from '../entities/Opus.js';
 
+/**
+ * 图文详情原始数据
+ *
+ * 实体包装见 {@link Opus}。
+ */
 export interface OpusDetail {
   item: {
     basic: {

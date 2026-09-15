@@ -1,8 +1,22 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
+import type { Video } from '../entities/Video.js';
+import type { VideoStatEntity } from '../entities/VideoStatEntity.js';
+import type { PlayUrlEntity } from '../entities/PlayUrlEntity.js';
+import type { OnlineCountEntity } from '../entities/OnlineCountEntity.js';
+import type { AiSummaryEntity } from '../entities/AiSummaryEntity.js';
+import type { VideoSnapshotEntity } from '../entities/VideoSnapshotEntity.js';
+import type { PbpEntity } from '../entities/PbpEntity.js';
+import type { VideoTagEntity } from '../entities/VideoTagEntity.js';
+import type { RecommendVideoEntity } from '../entities/RecommendVideoEntity.js';
 
 // ---- 类型定义 ----
 
+/**
+ * 视频稿件原始数据
+ *
+ * 实体包装见 {@link Video}。
+ */
 export interface VideoInfo {
   bvid: string;
   aid: number;
@@ -48,6 +62,11 @@ export interface VideoInfo {
   [key: string]: unknown;
 }
 
+/**
+ * 视频状态数原始数据
+ *
+ * 实体包装见 {@link VideoStatEntity}。
+ */
 export interface VideoStat {
   aid: number;
   bvid: string;
@@ -67,6 +86,11 @@ export interface VideoStat {
   evaluation: string;
 }
 
+/**
+ * 视频播放地址原始数据
+ *
+ * 实体包装见 {@link PlayUrlEntity}。
+ */
 export interface PlayUrlData {
   quality: number;
   format: string;
@@ -84,12 +108,22 @@ export interface PlayUrlData {
   last_play_cid?: number;
 }
 
+/**
+ * 视频在线观看人数原始数据
+ *
+ * 实体包装见 {@link OnlineCountEntity}。
+ */
 export interface OnlineCount {
   total: string;
   count: string;
   show_switch: { total: boolean; count: boolean };
 }
 
+/**
+ * 视频 AI 摘要原始数据
+ *
+ * 实体包装见 {@link AiSummaryEntity}。
+ */
 export interface AiSummary {
   code: number;
   stid: string;
@@ -103,6 +137,11 @@ export interface AiSummary {
   };
 }
 
+/**
+ * 视频快照原始数据
+ *
+ * 实体包装见 {@link VideoSnapshotEntity}。
+ */
 export interface VideoSnapshot {
   pvdata: string;
   img_x_len: number;
@@ -113,6 +152,11 @@ export interface VideoSnapshot {
   index: number[];
 }
 
+/**
+ * 高能进度条原始数据
+ *
+ * 实体包装见 {@link PbpEntity}。
+ */
 export interface PbpData {
   step_sec: number;
   tagstr: string;
@@ -120,6 +164,11 @@ export interface PbpData {
   debug: string;
 }
 
+/**
+ * 视频 TAG 原始数据
+ *
+ * 实体包装见 {@link VideoTagEntity}。
+ */
 export interface VideoTag {
   tag_id: number;
   tag_name: string;
@@ -128,6 +177,11 @@ export interface VideoTag {
   jump_url?: string;
 }
 
+/**
+ * 相关推荐视频原始数据
+ *
+ * 实体包装见 {@link RecommendVideoEntity}。
+ */
 export interface RecommendVideo {
   aid: number;
   bvid: string;

@@ -1,7 +1,14 @@
 import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
+import type { FavoriteFolder } from '../entities/FavoriteFolder.js';
+import type { FavoriteMediaEntity } from '../entities/FavoriteMediaEntity.js';
 
-export interface FavoriteFolder {
+/**
+ * 收藏夹元数据原始数据
+ *
+ * 实体包装见 {@link FavoriteFolder}。
+ */
+export interface FavoriteFolderData {
   id: number;
   fid: number;
   mid: number;
@@ -31,6 +38,11 @@ export interface FavoriteFolderListItem {
   media_count: number;
 }
 
+/**
+ * 收藏夹内容条目原始数据
+ *
+ * 实体包装见 {@link FavoriteMediaEntity}。
+ */
 export interface FavoriteMedia {
   id: number;
   type: number;
@@ -51,7 +63,7 @@ export interface FavoriteMedia {
 }
 
 export interface FavoriteListData {
-  info: FavoriteFolder;
+  info: FavoriteFolderData;
   medias: FavoriteMedia[] | null;
   has_more: boolean;
 }
@@ -61,7 +73,7 @@ export class FavoriteAPI {
   static async getFolderInfo(
     client: BiliClient<any>,
     mediaId: number,
-  ): Promise<BiliApiResponse<FavoriteFolder>> {
+  ): Promise<BiliApiResponse<FavoriteFolderData>> {
     return client.request(`https://api.bilibili.com/x/v3/fav/folder/info?media_id=${mediaId}`);
   }
 
@@ -115,7 +127,7 @@ export class FavoriteAPI {
     intro = '',
     privacy: 0 | 1 = 0,
     cover = '',
-  ): Promise<BiliApiResponse<FavoriteFolder>> {
+  ): Promise<BiliApiResponse<FavoriteFolderData>> {
     const csrf = client.config.getCsrf();
     return client.request('https://api.bilibili.com/x/v3/fav/folder/add', {
       method: 'POST',
@@ -132,7 +144,7 @@ export class FavoriteAPI {
     intro = '',
     privacy: 0 | 1 = 0,
     cover = '',
-  ): Promise<BiliApiResponse<FavoriteFolder>> {
+  ): Promise<BiliApiResponse<FavoriteFolderData>> {
     const csrf = client.config.getCsrf();
     return client.request('https://api.bilibili.com/x/v3/fav/folder/edit', {
       method: 'POST',

@@ -1,11 +1,43 @@
 import { BaseEntity } from './BaseEntity.js';
 import type { BiliApiResponse } from '../core/types.js';
-import type { ReplyNotification, AtNotification } from '../api/message.js';
+import type { ReplyNotification, AtNotification, BusinessType } from '../api/message.js';
 import { ReplyReportReason } from '../api/comment.js';
 import { CommentArea } from './CommentArea.js';
 import type { ReplyAddResult } from '../api/comment.js';
 
-/** "回复我的" 通知项 */
+/**
+ * 通知业务主体 URI 辅助器。
+ *
+ * 支持解析：
+ * - `https://www.bilibili.com/opus/<dynamicId>`
+ * - `https://www.bilibili.com/video/<bvid>`
+ */
+export class NotifyURIHelper {
+  constructor(private readonly uri: string) {}
+
+  /** 动态 ID；当前 URI 不是 Opus 链接时返回 null。 */
+  get dynamicId(): string | null {
+    const match = this.uri.match(/https:\/\/www\.bilibili\.com\/opus\/([0-9]+)/);
+    return match ? match[1] : null;
+  }
+
+  /** BV ID；当前 URI 不是视频链接时返回 null。 */
+  get videoId(): string | null {
+    const match = this.uri.match(/https:\/\/www\.bilibili\.com\/video\/([a-zA-Z0-9]+)/);
+    return match ? match[1] : null;
+  }
+
+  /** 未处理的原始 URI。 */
+  get raw(): string {
+    return this.uri;
+  }
+}
+
+/**
+ * "回复我的" 通知项
+ *
+ * 原始数据类型见 {@link ReplyNotification}。
+ */
 export class ReplyNotifyItem extends BaseEntity<ReplyNotification> {
   get id(): number { return this.rawData.id; }
   get authorName(): string { return this.rawData.user.nickname; }
@@ -13,12 +45,13 @@ export class ReplyNotifyItem extends BaseEntity<ReplyNotification> {
   get authorAvatar(): string { return this.rawData.user.avatar; }
   get title(): string { return this.rawData.item.title; }
   get content(): string { return this.rawData.item.source_content; }
-  get businessId(): number { return this.rawData.item.business_id; }
+  get businessId(): BusinessType | number { return this.rawData.item.business_id; }
   get business(): string { return this.rawData.item.business; }
   get subjectId(): number { return this.rawData.item.subject_id; }
   get rootId(): number { return this.rawData.item.root_id; }
   get sourceId(): number { return this.rawData.item.source_id; }
-  get uri(): string { return this.rawData.item.uri; }
+  /** 业务主体跳转 URI（提供动态 ID / BV ID 解析能力） */
+  get uri(): NotifyURIHelper { return new NotifyURIHelper(this.rawData.item.uri); }
   get replyTime(): number { return this.rawData.reply_time; }
 
   /** 评论区对象 */
@@ -62,7 +95,11 @@ export class ReplyNotifyItem extends BaseEntity<ReplyNotification> {
   }
 }
 
-/** "@我的" 通知项 */
+/**
+ * "@我的" 通知项
+ *
+ * 原始数据类型见 {@link AtNotification}。
+ */
 export class AtNotifyItem extends BaseEntity<AtNotification> {
   get id(): number { return this.rawData.id; }
   get authorName(): string { return this.rawData.user.nickname; }
@@ -70,12 +107,13 @@ export class AtNotifyItem extends BaseEntity<AtNotification> {
   get authorAvatar(): string { return this.rawData.user.avatar; }
   get title(): string { return this.rawData.item.title; }
   get content(): string { return this.rawData.item.source_content; }
-  get businessId(): number { return this.rawData.item.business_id; }
+  get businessId(): BusinessType | number { return this.rawData.item.business_id; }
   get business(): string { return this.rawData.item.business; }
   get subjectId(): number { return this.rawData.item.subject_id; }
   get rootId(): number { return this.rawData.item.root_id; }
   get sourceId(): number { return this.rawData.item.source_id; }
-  get uri(): string { return this.rawData.item.uri; }
+  /** 业务主体跳转 URI（提供动态 ID / BV ID 解析能力） */
+  get uri(): NotifyURIHelper { return new NotifyURIHelper(this.rawData.item.uri); }
   get atTime(): number { return this.rawData.at_time; }
 
   /** 评论区对象 */

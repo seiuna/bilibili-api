@@ -1,7 +1,14 @@
 import { BaseEntity } from './BaseEntity.js';
-import type { FavoriteFolder as FavoriteFolderData, FavoriteMedia } from '../api/favorite.js';
+import type { FavoriteFolderData } from '../api/favorite.js';
 import { FavoriteAPI } from '../api/favorite.js';
+import { FavoriteMediaPageEntity } from './FavoriteMediaPageEntity.js';
+import { FavoriteMediaEntity } from './FavoriteMediaEntity.js';
 
+/**
+ * 收藏夹实体
+ *
+ * 原始数据类型见 {@link FavoriteFolderData}。
+ */
 export class FavoriteFolder extends BaseEntity<FavoriteFolderData> {
   get id(): number { return this.rawData.id; }
   get fid(): number { return this.rawData.fid; }
@@ -14,14 +21,19 @@ export class FavoriteFolder extends BaseEntity<FavoriteFolderData> {
   get upper(): FavoriteFolderData['upper'] { return this.rawData.upper; }
 
   /** 获取收藏夹内容列表（单页） */
-  async getMedias(ps = 20, pn = 1): Promise<{ medias: FavoriteMedia[] | null; hasMore: boolean }> {
+  async getMedias(ps = 20, pn = 1): Promise<FavoriteMediaPageEntity> {
     const res = await FavoriteAPI.getFolderList(this.client, this.id, ps, pn);
-    return { medias: res.data.medias, hasMore: res.data.has_more };
+    return new FavoriteMediaPageEntity(this.client, {
+      medias: res.data.medias,
+      hasMore: res.data.has_more,
+    });
   }
 
   /** 收藏夹内容翻页 — async generator */
-  async *medias(ps = 20): AsyncGenerator<FavoriteMedia> {
-    yield* FavoriteAPI.folderList(this.client, this.id, ps);
+  async *medias(ps = 20): AsyncGenerator<FavoriteMediaEntity> {
+    for await (const item of FavoriteAPI.folderList(this.client, this.id, ps)) {
+      yield new FavoriteMediaEntity(this.client, item);
+    }
   }
 
   /** 修改收藏夹 */

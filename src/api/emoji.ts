@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface EmoteItem {

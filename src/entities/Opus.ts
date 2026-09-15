@@ -2,6 +2,11 @@ import { BaseEntity } from './BaseEntity.js';
 import type { OpusDetail } from '../api/opus.js';
 import { CommentArea } from './CommentArea.js';
 
+/**
+ * 图文实体
+ *
+ * 原始数据类型见 {@link OpusDetail}。
+ */
 export class Opus extends BaseEntity<OpusDetail['item']> {
   get id(): string { return this.rawData.id_str; }
   get type(): string { return this.rawData.type; }
