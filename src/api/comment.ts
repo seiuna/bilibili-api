@@ -8,6 +8,9 @@ export enum ReplyType {
   ARTICLE = 12,
   AUDIO = 14,
   ALBUM = 16,
+  /**
+   * @deprecated Use DYNAMIC instead.
+   */
   WORD_DYNAMIC = 17,
   COMIC = 22,
   COURSE = 33,
@@ -128,6 +131,8 @@ export interface ReplyEntry {
    * 用于唯一标识一条评论
    */
   rpid: number;
+  /** 精确的评论 ID；优先用于匹配，避免数值 ID 丢失精度。 */
+  rpid_str?: string;
 
   /**
    * 评论区所属资源 ID
@@ -447,57 +452,56 @@ export class CommentAPI {
   }
 
   /**
-   * 
-   * @param client 
-   * @param oid subject_id
-   * @param replyType business_id, 
-   * @param rpid target_id
-   * @returns 
+   * 在 jump 响应中定位指定评论，不会把其他评论当作目标返回。
+   * @param client 请求客户端
+   * @param oid 评论区主体 ID，例如通知的 subject_id
+   * @param replyType 评论区业务类型，例如通知的 business_id
+   * @param rpid 要查询的评论 ID（不固定对应通知的 target_id）
+   * @returns 保留上游状态；请求失败或响应中未找到目标时 data 为 null。
    */
   static async getReply(
     client: BiliClient<any>,
-    oid: number,
+    oid: number | string,
     replyType: number,
     rpid: number | string,
-  ): Promise<BiliApiResponse<ReplyEntry>> {
-    const params = new URLSearchParams({
-      oid: String(oid),
-      type: String(replyType),
-      rpid: String(rpid),
-    });
-    const res = await client.request<BiliApiResponse<{ replies?: ReplyEntry[]; root?: ReplyEntry }>>(
-      `https://api.bilibili.com/x/v2/reply/jump?${params}`,
-    );
-
-    const rpidStr = String(rpid);
-    let target: ReplyEntry | null = null;
-
-    if (res.data?.root && String(res.data.root.rpid) === rpidStr) {
-      target = res.data.root;
+  ): Promise<BiliApiResponse<ReplyEntry | null>> {
+    for (const [name, id] of [['oid', oid], ['rpid', rpid]] as const) {
+      if (typeof id === 'number' && !Number.isSafeInteger(id)) {
+        throw new RangeError(`${name} 必须是安全整数，长 ID 请传入字符串`);
+      }
+      if (!/^[1-9]\d*$/.test(String(id).trim())) {
+        throw new TypeError(`${name} 必须是正整数 ID`);
+      }
     }
+    const rpidStr = String(rpid).trim();
+    const params = new URLSearchParams({
+      oid: String(oid).trim(),
+      type: String(replyType),
+      rpid: rpidStr,
+    });
+    const res = await client.request<BiliApiResponse<{
+      replies?: ReplyEntry[] | null;
+      root?: ReplyEntry | null;
+    } | null>>(`https://api.bilibili.com/x/v2/reply/jump?${params}`);
 
-    if (!target && res.data?.replies) {
-      for (const r of res.data.replies) {
-        if (String(r.rpid) === rpidStr) {
-          target = r;
+    let target: ReplyEntry | null = null;
+    if (res.code === 0 && res.data) {
+      const stack = [...(res.data.replies ?? [])];
+      if (res.data.root) stack.push(res.data.root);
+      while (stack.length > 0) {
+        const reply = stack.pop()!;
+        const id = reply.rpid_str ?? (
+          Number.isSafeInteger(reply.rpid) ? String(reply.rpid) : undefined
+        );
+        if (id === rpidStr) {
+          target = reply;
           break;
         }
-        if (r.replies && r.replies.length > 0) {
-          const sub = r.replies.find((sr) => String(sr.rpid) === rpidStr);
-          if (sub) {
-            target = sub;
-            break;
-          }
-        }
+        if (Array.isArray(reply.replies)) stack.push(...reply.replies);
       }
     }
 
-    return {
-      code: res.code,
-      message: res.message,
-      ttl: res.ttl,
-      data: target as ReplyEntry,
-    };
+    return { code: res.code, message: res.message, ttl: res.ttl, data: target };
   }
 
   /**
@@ -571,7 +575,7 @@ export class CommentAPI {
   /** 发表评论 */
   static async add(
     client: BiliClient<any>,
-    oid: number,
+    oid: number | string,
     message: string,
     replyType: number,
     root = 0,

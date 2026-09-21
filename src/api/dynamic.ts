@@ -46,9 +46,18 @@ export interface DynamicModule {
 export interface DynamicDetail {
   item: {
     basic: {
+      /**
+       * use this field to add comment to dynamic, fk bilibili.
+       */
       comment_id_str: string;
+      /**
+       * This field is always 11 for dynamic.
+       */
       comment_type: number;
       jump_url?: string;
+      /**
+       * same as comment_id_str.
+       */
       rid_str: string;
       title?: string;
       uid?: number;
@@ -165,6 +174,9 @@ export interface CreateDynamicResult {
   result: number;
   message?: string;
   dyn_id: number;
+  /**
+   * do not use dyn_id as dynamic ID, use dyn_id_str instead, fk bilibili
+   */
   dyn_id_str: string;
   dyn_type: number;
   dyn_rid?: number;

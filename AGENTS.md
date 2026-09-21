@@ -5,8 +5,10 @@
 - `npm run build` — `tsup index.ts --format esm --dts`，产物在 `dist/`。
 - `npm run dev` — build 的 watch 模式。
 - `npm run demo` — 运行 `scripts/auto-reply.ts`，会**登录真实账号并自动发评论**。只在明确想跑 demo 时使用。
-- `npm test` — vitest，运行 `src/*.test.ts`。无需登录的测试默认会跑；需要登录的测试在 `bili-config.json` 有效时才会执行。写操作测试默认跳过，需 `ENABLE_WRITE_TESTS=1 npm test` 才会执行。
-- `npx vitest run src/all-features.test.ts` — 完整集成测试（读操作），会走一遍视频/评论/用户空间/通知等接口。
+- `npm test` / `npm run test:watch` — 单元测试与匿名网络测试，默认配置排除 `src/**/*.login.test.ts`。
+- `npm run test:login` — 使用独立配置，仅运行真实已登录账号只读测试；必须显式设置 `BILI_TEST_PROFILE` 为已有 UID、Profile 别名或配置路径。不会自动扫码，不执行业务写操作；正常 SDK 凭证刷新可能更新 Profile。配置缺失或接口失败时测试失败，不静默跳过。
+- `npm run test:all` — 先运行默认测试，再运行登录测试；替代旧 `full-test` 脚本。不包含写操作测试。
+- `npm run test:write` — 独立真实写操作测试（`*.write.test.ts`），默认/watch/login/all 均不包含；必须设置 `BILI_TEST_PROFILE` 和 `ENABLE_WRITE_TESTS=1`。会真实创建动态、评论并尝试删除本次动态，只有用户明确要求运行写测试时才可运行。
 - `npx tsc --noEmit` — 类型检查。
 
 ## 入口与脚本

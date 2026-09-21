@@ -6,9 +6,50 @@
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green?logo=node.js)](https://nodejs.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
+[![License](https://img.shields.io/badge/License-GPL--3.0--only-blue)](./LICENSE)
 
 </div>
+
+## 测试
+
+| 命令 | 范围 |
+| --- | --- |
+| `npm test` | 单元测试和匿名网络测试，排除 `*.login.test.ts` |
+| `npm run test:watch` | 同样排除登录测试的 watch 模式 |
+| `npm run test:login` | 仅运行 `*.login.test.ts` 的真实已登录账号读取测试 |
+| `npm run test:all` | 先运行默认测试，再运行登录测试 |
+| `npm run typecheck` | TypeScript 类型检查 |
+
+登录测试须显式指定已有 Profile，不自动探测账号、不自动扫码、不执行点赞或发评等业务写操作。它验证现有登录态及账号 API，不测试交互式扫码登录流程。SDK 的正常 Cookie 合并和凭证刷新仍可能更新所选 Profile，请使用测试账号。已有 Profile 的 JSON 解析或非文件缺失类读取错误会直接抛出，不会用默认配置覆盖原文件。
+
+PowerShell：
+
+```powershell
+$env:BILI_TEST_PROFILE = '你的UID或Profile别名'
+npm run test:login
+```
+
+Bash：
+
+```bash
+BILI_TEST_PROFILE=你的UID或Profile别名 npm run test:login
+```
+
+也可指定包含路径分隔符的配置文件路径。缺少配置、凭证失效、网络错误或 API 非零业务码都会使登录测试失败，不会作为成功跳过。凭证应保存在已被 Git 忽略的 `profiles/` 中，不要提交或打印 Cookie。默认测试无需设置 `BILI_TEST_PROFILE`，即使设置了也不会运行登录测试。原 `full-test` 脚本由 `test:all` 取代。
+
+### 创建动态并发表评论（真实写操作，仅显式运行）
+
+`src/test/dynamic/create-comment.write.test.ts` 使用真实账号创建一条带唯一标记的纯文字动态，确认评论区类型及字符串 ID，发表评论，再读取评论验证正文、作者与根评论关系。测试结束时，无论中间断言是否失败，都会尝试删除本次创建的动态；删除失败会报错并输出动态链接。若创建请求超时或返回值缺少 ID，可能无法自动清理，请手动检查账号。测试内容可能在删除前被他人看到。
+
+默认 `npm test`、watch、`test:login` 和 `test:all` **均不运行写操作测试**。仅在明确允许真实发动态、评论和删除后执行：
+
+```powershell
+$env:BILI_TEST_PROFILE = '你的测试账号UID或Profile别名'
+$env:ENABLE_WRITE_TESTS = '1'
+npm run test:write
+```
+
+`test:write` 使用独立的 `vitest.write.config.ts`，未设置写开关会失败而不是静默跳过。不自动扫码，测试本身不额外重试发动态或评论；但 SDK 在响应为 `-101` 且存在刷新令牌时，仍会刷新凭证并重试原请求（包括写请求）。刷新后仍失败、其他远端错误、风控或内容尚未可读都会使测试失败。请使用专用测试账号。`CommentAPI.add` 和 `CommentAPI.getReply` 的 `oid` 参数支持 `number | string`，动态评论区应传入字符串 ID，不要转成 `number`。
 
 ## 安装
 
@@ -53,13 +94,13 @@ const authed = await client.ensureLogin({             // ← 返回 BiliClient<H
 });
 
 // 现在可以调用需要登录的方法
-const myInfo = await authed.getMyInfo();               // ✅ 获取当前登录用户信息
-const toView = await authed.history.getToViewList();  // ✅
-const unread = await authed.message.unreadCount();     // ✅
+const myInfo = await authed.getMyInfo();               // ✅ 获取当前登录用户信息（实体）
+const toView = await authed.getToViewList();           // ✅ 稍后再看列表（实体）
+const unread = await authed.message.unreadCount(authed); // ✅ 消息未读计数（底层 API）
 
 // 退出登录后降级为未认证
 const anon = await authed.logout();                    // BiliClient<void>
-// anon.history.getToViewList();                       // ❌ 编译错误
+// anon.history.getToViewList(anon);                   // ❌ 编译错误：未认证客户端无法访问需要登录的子 API
 ```
 
 ---
@@ -141,14 +182,27 @@ src/
 
 > **实体命名约定**：与资源同名的一级实体直接用资源名（`Video`、`User`、`Article`、`Dynamic`、`Opus`、`LiveRoom`、`FavoriteFolder`、`Comment`）；附属实体统一加 `Entity` 后缀以避免与同名 raw 类型冲突（如 `VideoStatEntity`、`HistoryDataEntity`）。底层 API 类（`VideoAPI` / `CommentAPI` 等）仍返回原始 `BiliApiResponse`。
 
-### 子 API — 通过 `client.video` / `client.user` / `client.comment` 等访问
+### 子 API 调用范式 — 通过静态类或 `client.<name>` 访问
 
-所有子 API 以**静态类**方式提供，也可独立导入使用：
+底层子 API 以**静态类（Static Classes）**方式提供。多数普通 JSON 请求方法以 `client` 实例为第一个参数，返回 `Promise<BiliApiResponse<T>>`，但以下方法使用不同的契约：
+
+- `DanmakuAPI.getXmlDanmaku(client, cid)` 返回 `Promise<string>`（XML 文本）。
+- `SearchAPI.getSuggest(client, term)` 返回包含 `code` 和 `result.tag` 的对象（由 Promise 包装），而不是标准的 `data` 包装。
+- 分页方法（如 `MessageAPI.sessions(client)`）返回 `AsyncGenerator`，通过 `for await...of` 消费。
+- `CommonAPI.av2bv(aid)`、`CommonAPI.bv2av(bvid)`、`CommonAPI.getCurrentTimestamp()` 等纯工具方法不接收 `client`。
+
+支持两种完全等价的调用风格：
 
 ```ts
-import { VideoAPI } from '@seiuna/bilibili-api';
+// 方式一：直接导入静态 API 类（推荐）
+import { VideoAPI, SearchAPI } from '@seiuna/bilibili-api';
 
 const info = await VideoAPI.getInfo(client, 'BV1GJ411x7h7');
+const searchResult = await SearchAPI.searchAll(client, '哔哩哔哩');
+
+// 方式二：通过 client 实例属性访问对应静态类
+const info2 = await client.video.getInfo(client, 'BV1GJ411x7h7');
+const searchResult2 = await client.search.searchAll(client, '哔哩哔哩');
 ```
 
 | 子 API | 入口 | 需登录 getter | 需登录 setter |
@@ -226,9 +280,9 @@ const video = await client.getVideo('BV1GJ411x7h7');
 console.log(video.title);
 console.log(`播放: ${video.stat.view}  点赞: ${video.stat.like}`);
 
-// 视频流地址
+// 视频流地址（返回 PlayUrlEntity 实体，直接通过 getter 访问属性，无需 .data）
 const playUrl = await video.getPlayUrl({ qn: 80, fnval: 16 });
-console.log(playUrl.data.dash?.video[0]?.baseUrl);
+console.log(playUrl.dash?.video[0]?.baseUrl);
 
 // AI 摘要
 const summary = await video.getAiSummary();
@@ -271,6 +325,16 @@ for await (const page of area.list(ReplySort.TIME)) {
 const singlePage = await area.getPage(1, ReplySort.TIME, 20);
 console.log(`总数: ${singlePage.data.page.acount}, 当前获取: ${singlePage.data.replies?.length}`);
 ```
+
+### 精确查找评论
+
+`CommentAPI.getReply(client, oid, replyType, rpid)` 返回 `Promise<BiliApiResponse<ReplyEntry | null>>`。`oid` 和 `rpid` 接受正整数或十进制字符串，超出安全整数范围时必须使用字符串；输入两端空白会被移除。方法优先按响应的 `rpid_str` 匹配，并遍历根评论及子评论。上游失败或响应中不包含指定评论时，`data` 为 `null`，不会返回其他评论代替目标；`code`、`message`、`ttl` 保留上游值，因此 `code === 0` 后仍需检查 `data`。`rpid` 是所需评论的 ID，不固定对应通知的 `target_id`。
+
+### 从评论获取所属资源
+
+`Comment.getDynamic(): Promise<Dynamic>` 仅支持 `type=17` 的动态评论，优先使用原始响应的 `dynamic_id_str`，仅当 `oid` 为正的安全整数时才回退使用它。缺少可靠 ID 时会抛出错误，不发送可能已丢失精度的 ID。`type=11` 的 `oid` 是图文动态的 `doc_id`，不能直接作为动态 ID。
+
+`Comment.getSubject(): Promise<Video | Dynamic>` 对 `type=1` 调用 `getVideo()`，对 `type=17` 调用 `getDynamic()`；其他类型会抛出错误。
 
 ### 发表 / 回复 / 带图
 
@@ -351,25 +415,27 @@ const uid  = await UserAPI.nameToUid(authed, 'bilibili');
 ## 消息与私信
 
 ```ts
-const msg = authed.message;
-
-// 未读计数
-const unread = await msg.unreadCount();
-console.log(`回复:${unread.data.reply}  @:${unread.data.at}`);
-
-// "回复我的" 翻页
-for await (const item of msg.replyFeed()) {
-  console.log(`${item.user.nickname}: ${item.item.source_content}`);
+// 门面方法（推荐：逐项返回 NotifyItem 包装实体，直接通过 getter 取值）
+for await (const item of authed.replyFeed()) {
+  console.log(`${item.authorName}: ${item.content}`);
 }
 
-// "@我的" 翻页
-for await (const item of msg.atFeed()) { }
+for await (const item of authed.atFeed()) {
+  console.log(`${item.authorName}: ${item.content}`);
+}
+
+// 底层 MessageAPI 调用（传入客户端实例）
+import { MessageAPI } from '@seiuna/bilibili-api';
+
+// 未读计数
+const unread = await MessageAPI.unreadCount(authed);
+console.log(`回复:${unread.data.reply}  @:${unread.data.at}`);
 
 // 会话列表
-for await (const { sessions } of msg.sessions()) { }
+for await (const { sessions } of MessageAPI.sessions(authed)) { }
 
 // 消息中心设置
-const settings = await msg.getSettings();
+const settings = await MessageAPI.getSettings(authed);
 ```
 
 ### 自动处理 @ 和 回复
@@ -405,16 +471,16 @@ const interval = setInterval(async () => {
 ## 搜索
 
 ```ts
-const search = client.search;
+import { SearchAPI } from '@seiuna/bilibili-api';
 
 // 综合搜索
-const result = await search.searchAll(authed, 'meow');
+const result = await SearchAPI.searchAll(client, 'meow');
 
 // 热搜
-const hot = await search.getHotSearch(authed, 10);
+const hot = await SearchAPI.getHotSearch(client, 10);
 
 // 搜索建议
-const suggest = await search.getSuggest(authed, 'bilibili');
+const suggest = await SearchAPI.getSuggest(client, 'bilibili');
 ```
 
 ---
@@ -422,17 +488,20 @@ const suggest = await search.getSuggest(authed, 'bilibili');
 ## 历史记录与稍后再看
 
 ```ts
-const history = authed.history;   // 需登录
-
-// 翻页获取历史
-for await (const item of history.history(authed, 30)) {
+// 门面方法（推荐：逐项返回 HistoryItemEntity 实体）
+for await (const item of authed.getHistory(30)) {
   console.log(item.title, item.progress);
 }
 
-// 稍后再看
-const list = await history.getToViewList(authed);
-await history.addToView(authed, aid);
-await history.removeFromView(authed, aid);
+// 稍后再看（返回 ToViewListEntity 实体）
+const toView = await authed.getToViewList();
+console.log(`待看视频数: ${toView.count}`);
+
+// 底层 HistoryAPI 操作
+import { HistoryAPI } from '@seiuna/bilibili-api';
+
+await HistoryAPI.addToView(authed, aid);
+await HistoryAPI.removeFromView(authed, aid);
 ```
 
 ---
@@ -440,15 +509,22 @@ await history.removeFromView(authed, aid);
 ## 收藏夹
 
 ```ts
-const fav = client.favorite;
+// 门面方法（推荐：获取 FavoriteFolder 实体）
+const folder = await client.getFavoriteFolder(mediaId);
+console.log(folder.title, folder.mediaCount);
 
-// 获取收藏夹列表
-const folders = await fav.getCreatedFolders(authed, mid);
-if (folders.data.list?.length) {
-  const folder = folders.data.list[0];
+// 翻页遍历收藏夹内容（返回 FavoriteMediaEntity 实体）
+for await (const media of folder.medias(20)) {
+  console.log(media.title, media.bvid);
+}
 
-  // 获取内容
-  const contents = await fav.getFolderList(authed, folder.id);
+// 底层 FavoriteAPI 访问
+import { FavoriteAPI } from '@seiuna/bilibili-api';
+
+const folders = await FavoriteAPI.getCreatedFolders(client, mid);
+if (folders.data?.list?.length) {
+  const f = folders.data.list[0];
+  const contents = await FavoriteAPI.getFolderList(client, f.id);
 }
 ```
 
@@ -457,13 +533,16 @@ if (folders.data.list?.length) {
 ## 弹幕
 
 ```ts
-const dm = client.danmaku;
+import { DanmakuAPI } from '@seiuna/bilibili-api';
 
-// 历史弹幕日期索引
-const dates = await dm.getHistoryDates(authed, cid, '2025-07');
+// 获取 XML 实时弹幕（公开接口）
+const xml = await DanmakuAPI.getXmlDanmaku(client, cid);
 
-// 发送弹幕
-await dm.postDanmaku(authed, oid, '弹幕内容', { aid, progress: 10000 });
+// 历史弹幕日期索引（需登录）
+const dates = await DanmakuAPI.getHistoryDates(authed, cid, '2025-07');
+
+// 发送弹幕（需登录）
+await DanmakuAPI.postDanmaku(authed, oid, '弹幕内容', { aid, progress: 10000 });
 ```
 
 ---
@@ -471,9 +550,9 @@ await dm.postDanmaku(authed, oid, '弹幕内容', { aid, progress: 10000 });
 ## 表情
 
 ```ts
-const emoji = client.emoji;
+import { EmojiAPI } from '@seiuna/bilibili-api';
 
-const panel = await emoji.getPanel(authed);
+const panel = await EmojiAPI.getPanel(client, 'reply');
 // panel.data.packages[].emote[] — 每个表情包内的表情列表
 ```
 
@@ -574,16 +653,16 @@ const opusArea = opus.commentArea();
 ## 排行与热门
 
 ```ts
-const rank = client.ranking;
+import { RankingAPI } from '@seiuna/bilibili-api';
 
 // 热门视频
-const popular = await rank.getPopular(authed);
+const popular = await RankingAPI.getPopular(client, 1, 20);
 
 // 排行榜
-const ranking = await rank.getRanking(authed);
+const ranking = await RankingAPI.getRanking(client, 0, 'all');
 
 // 入站必刷
-const precious = await rank.getPreciousVideos(authed);
+const precious = await RankingAPI.getPreciousVideos(client);
 ```
 
 ---
@@ -591,10 +670,15 @@ const precious = await rank.getPreciousVideos(authed);
 ## 直播
 
 ```ts
-const live = client.live;
+// 门面方法（推荐：返回 LiveRoom 实体）
+const room = await client.getLiveRoom(roomId);
+console.log(`标题: ${room.title}  在线: ${room.online}  短号: ${room.shortId}`);
 
-const room = await live.getRoomInfo(authed, roomId);
-console.log(`标题: ${room.data.title}  在线: ${room.data.online}`);
+// 底层 LiveAPI 静态类调用
+import { LiveAPI } from '@seiuna/bilibili-api';
+
+const res = await LiveAPI.getRoomInfo(client, roomId);
+console.log(`标题: ${res.data.title}  在线: ${res.data.online}`);
 ```
 
 ---
@@ -632,8 +716,11 @@ const url = await upload.uploadFromUrl(authed, 'https://example.com/pic.jpg');
 ```ts
 import { av2bv, bv2av, formatImageUrl } from '@seiuna/bilibili-api';
 
-av2bv(170001);                 // "BV1xx411c7mD"
-bv2av('BV1xx411c7mD');         // 170001
+av2bv(170001);                 // "BV17x411w7KC"
+bv2av('BV17x411w7KC');         // 170001
+
+av2bv(80433022);               // "BV1GJ411x7h7"
+bv2av('BV1GJ411x7h7');         // 80433022
 
 // 图片 CDN 参数格式化
 formatImageUrl(url, { width: 200, height: 200, format: 'webp' });

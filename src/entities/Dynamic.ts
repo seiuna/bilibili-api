@@ -1,4 +1,5 @@
 import { BaseEntity } from './BaseEntity.js';
+import { assertOk } from '../core/client.js';
 import type { DynamicDetail, DynamicModule, DynamicOpusPicture } from '../api/dynamic.js';
 import { DynamicAPI } from '../api/dynamic.js';
 import { CommentArea } from './CommentArea.js';
@@ -48,26 +49,31 @@ export class Dynamic extends BaseEntity<DynamicDetail['item']> {
 
   /** 点赞动态 */
   async like(): Promise<void> {
-    await DynamicAPI.like(this.client, this.id, 1);
+    const res = await DynamicAPI.like(this.client, this.id, 1);
+    assertOk(res);
   }
 
   /** 取消点赞 */
   async unlike(): Promise<void> {
-    await DynamicAPI.like(this.client, this.id, 2);
+    const res = await DynamicAPI.like(this.client, this.id, 2);
+    assertOk(res);
   }
 
   /** 删除动态 */
   async delete(): Promise<void> {
-    await DynamicAPI.delete(this.client, this.id);
+    const res = await DynamicAPI.delete(this.client, this.id);
+    assertOk(res);
   }
 
   /** 设置置顶 */
   async setTop(): Promise<void> {
-    await DynamicAPI.setTop(this.client, this.id);
+    const res = await DynamicAPI.setTop(this.client, this.id);
+    assertOk(res);
   }
 
   /** 取消置顶 */
   async removeTop(): Promise<void> {
-    await DynamicAPI.removeTop(this.client, this.id);
+    const res = await DynamicAPI.removeTop(this.client, this.id);
+    assertOk(res);
   }
 }

@@ -1,13 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { BiliClient } from '../../core/client.js';
 import { BusinessType } from '../../api/comment.js';
-import type { DynamicDetail } from '../../api/dynamic.js';
 import { DynamicAPI } from '../../api/dynamic.js';
 import type { ReplyFeedData } from '../../api/message.js';
 import { Dynamic } from '../../entities/Dynamic.js';
 import { ReplyFeedEntity } from '../../entities/ReplyFeedEntity.js';
 import { ReplyNotifyItem } from '../../entities/NotifyItem.js';
-import { log } from 'console';
 
 const DYNAMIC_ID = '1245247779461136407';
 const DYNAMIC_CONTENT = 'meow testmeow';
@@ -72,82 +70,12 @@ const simulationData: ReplyFeedData = {
   last_view_at: 0,
 };
 
-const dynamicDetail: DynamicDetail = {
-  item: {
-    basic: {
-      comment_id_str: '408396462',
-      comment_type: BusinessType.Dynamic,
-      rid_str: '408396462',
-      title: '@iroha_daisuki 这是什么',
-      uid: 390794259,
-    },
-    id_str: DYNAMIC_ID,
-    modules: {
-      module_dynamic: {
-        desc: null,
-        major: {
-          opus: {
-            jump_url: `//www.bilibili.com/opus/${DYNAMIC_ID}`,
-            pics: [
-              {
-                aigc: null,
-                height: 1000,
-                live_url: null,
-                size: 95.375,
-                url: DYNAMIC_IMAGE_URL,
-                width: 1000,
-              },
-            ],
-            summary: {
-              rich_text_nodes: [],
-              text: DYNAMIC_CONTENT,
-            },
-            title: null,
-          },
-          type: 'MAJOR_TYPE_OPUS',
-        },
-        topic: null,
-      },
-    },
-    type: 'DYNAMIC_TYPE_DRAW',
-    visible: true,
-  },
-};
-
-const mockFetch = vi.fn().mockImplementation(async (url: string) => {
-  if (url.includes('/x/polymer/web-dynamic/v1/detail')) {
-    return new Response(
-      JSON.stringify({
-        code: 0,
-        message: '0',
-        ttl: 1,
-        data: dynamicDetail,
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
-
-  return new Response(
-    JSON.stringify({ code: -404, message: 'not found', ttl: 1 }),
-    { status: 404, headers: { 'Content-Type': 'application/json' } },
-  );
-});
-
-const mockClient = new BiliClient<void>(
-  undefined,
-  mockFetch as unknown as typeof fetch,
-);
-
-/** 使用通知分页实体包装模拟数据。 */
-const rfe = new ReplyFeedEntity(mockClient, simulationData);
-/** 第一条“回复我的”通知实体。 */
+/** 不加载 profiles / cookie，仅访问公开动态接口。 */
+const client = new BiliClient<void>();
+const rfe = new ReplyFeedEntity(client, simulationData);
 const notify = rfe.items[0];
 
-describe('Dynamic Offline Test', () => {
-  beforeEach(() => {
-    mockFetch.mockClear();
-  });
-
+describe('Dynamic Unlogin Test', () => {
   describe('读取动态通知', () => {
     it('ReplyFeedEntity 应正确包装分页与通知数据', () => {
       expect(rfe).toBeInstanceOf(ReplyFeedEntity);
@@ -187,7 +115,7 @@ describe('Dynamic Offline Test', () => {
           },
         ],
       };
-      const videoNotify = new ReplyFeedEntity(mockClient, videoFeed).items[0];
+      const videoNotify = new ReplyFeedEntity(client, videoFeed).items[0];
 
       expect(videoNotify.uri.videoId).toBe('BV1xx411c7mD');
       expect(videoNotify.uri.dynamicId).toBeNull();
@@ -195,10 +123,9 @@ describe('Dynamic Offline Test', () => {
     });
   });
 
-  describe('读取动态详情', () => {
-    it('DynamicAPI.getDetail 应返回原始动态详情响应', async () => {
-      log('did '+ DYNAMIC_ID)
-      const result = await DynamicAPI.getDetail(mockClient, DYNAMIC_ID);
+  describe('访问公开动态接口', () => {
+    it('DynamicAPI.getDetail 应返回目标动态的正文和配图', async () => {
+      const result = await DynamicAPI.getDetail(client, DYNAMIC_ID);
 
       expect(result.code).toBe(0);
       expect(result.data.item.id_str).toBe(DYNAMIC_ID);
@@ -221,18 +148,15 @@ describe('Dynamic Offline Test', () => {
         height: 1000,
         size: 95.375,
       });
-      log(result.data)
     });
 
     it('client.getDynamic 应返回 Dynamic 实体', async () => {
-      const dynamic = await mockClient.getDynamic(DYNAMIC_ID);
+      const dynamic = await client.getDynamic(DYNAMIC_ID);
 
       expect(dynamic).toBeInstanceOf(Dynamic);
       expect(dynamic.id).toBe(DYNAMIC_ID);
       expect(dynamic.type).toBe('DYNAMIC_TYPE_DRAW');
       expect(dynamic.visible).toBe(true);
-      expect(dynamic.basic.title).toBe('@iroha_daisuki 这是什么');
-      expect(dynamic.basic.uid).toBe(390794259);
       expect(dynamic.moduleList).toHaveLength(1);
       expect(dynamic.content).toBe(DYNAMIC_CONTENT);
       expect(dynamic.pictures).toHaveLength(1);

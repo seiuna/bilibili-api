@@ -1,4 +1,5 @@
 import { BaseEntity } from './BaseEntity.js';
+import { assertOk } from '../core/client.js';
 import type { FavoriteFolderData } from '../api/favorite.js';
 import { FavoriteAPI } from '../api/favorite.js';
 import { FavoriteMediaPageEntity } from './FavoriteMediaPageEntity.js';
@@ -38,21 +39,25 @@ export class FavoriteFolder extends BaseEntity<FavoriteFolderData> {
 
   /** 修改收藏夹 */
   async edit(title: string, intro = '', privacy: 0 | 1 = 0, cover = ''): Promise<void> {
-    await FavoriteAPI.editFolder(this.client, this.id, title, intro, privacy, cover);
+    const res = await FavoriteAPI.editFolder(this.client, this.id, title, intro, privacy, cover);
+    assertOk(res);
   }
 
   /** 删除收藏夹 */
   async delete(): Promise<void> {
-    await FavoriteAPI.deleteFolder(this.client, [this.id]);
+    const res = await FavoriteAPI.deleteFolder(this.client, [this.id]);
+    assertOk(res);
   }
 
   /** 批量删除内容 */
   async deleteResources(resources: string): Promise<void> {
-    await FavoriteAPI.deleteResources(this.client, this.id, resources);
+    const res = await FavoriteAPI.deleteResources(this.client, this.id, resources);
+    assertOk(res);
   }
 
   /** 清空失效内容 */
   async cleanInvalid(): Promise<void> {
-    await FavoriteAPI.cleanInvalidResources(this.client, this.id);
+    const res = await FavoriteAPI.cleanInvalidResources(this.client, this.id);
+    assertOk(res);
   }
 }

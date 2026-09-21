@@ -85,22 +85,34 @@ export class Comment extends BaseEntity<ReplyEntry> {
     return new Video(this.client, res.data);
   }
 
-  /** 
-   * type = 11 时为图文动态此方法失效
-   * 获取该评论所属动态（仅 type=17） 
+  /**
+   * 获取该评论所属的纯文字动态（仅 type=17）。
+   *
+   * type=11 表示图文动态 / 相簿，其 oid 是 doc_id，不能直接作为动态 ID
+   * 调用详情接口。优先使用 dynamic_id_str，仅在 oid 为正的安全整数时回退；
+   * 缺少可靠 ID 时抛出错误，不发送可能已丢失精度的 ID。
    */
   async getDynamic(): Promise<Dynamic> {
-    if (this.type !== ReplyType.DYNAMIC) {
-      throw new Error(`Comment.getDynamic() 只支持动态评论（type=17），当前 type=${this.type}`);
+    if (this.type !== ReplyType.WORD_DYNAMIC) {
+      throw new Error(`Comment.getDynamic() 只支持纯文字动态评论（type=17），当前 type=${this.type}`);
     }
-    const res = await DynamicAPI.getDetail(this.client, String(this.oid));
+    const stringId = this.rawData.dynamic_id_str;
+    let dynamicId: string;
+    if (stringId && /^[1-9]\d*$/.test(stringId)) {
+      dynamicId = stringId;
+    } else if (Number.isSafeInteger(this.oid) && this.oid > 0) {
+      dynamicId = String(this.oid);
+    } else {
+      throw new Error('Comment.getDynamic() 缺少可靠的字符串动态 ID，不能使用不安全的 oid');
+    }
+    const res = await DynamicAPI.getDetail(this.client, dynamicId);
     return new Dynamic(this.client, res.data.item);
   }
 
-  /** 根据评论类型自动返回所属视频或动态 */
+  /** 根据评论类型自动返回所属视频或纯文字动态。 */
   async getSubject(): Promise<Video | Dynamic> {
     if (this.type === ReplyType.VIDEO) return this.getVideo();
-    if (this.type === ReplyType.DYNAMIC) return this.getDynamic();
+    if (this.type === ReplyType.WORD_DYNAMIC) return this.getDynamic();
     throw new Error(`Comment.getSubject() 暂不支持 type=${this.type}`);
   }
 

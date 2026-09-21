@@ -83,7 +83,7 @@ export class FavoriteAPI {
     upMid: number,
     type: 0 | 2 = 0,
     rid?: number,
-  ): Promise<BiliApiResponse<{ count: number; list: FavoriteFolderListItem[] }>> {
+  ): Promise<BiliApiResponse<{ count: number; list: FavoriteFolderListItem[] } | null>> {
     const params = new URLSearchParams({ up_mid: String(upMid), type: String(type) });
     if (rid) params.set('rid', String(rid));
     return client.request(`https://api.bilibili.com/x/v3/fav/folder/created/list-all?${params}`);

@@ -1,4 +1,5 @@
 import { BaseEntity } from './BaseEntity.js';
+import { assertOk } from '../core/client.js';
 import type { UserInfo } from '../api/user.js';
 import { UserAPI } from '../api/user.js';
 import { DynamicAPI } from '../api/dynamic.js';
@@ -62,32 +63,38 @@ export class User extends BaseEntity<UserInfo> {
 
   /** 关注该用户 */
   async follow(): Promise<void> {
-    await UserAPI.modifyRelation(this.client, this.mid, 1);
+    const res = await UserAPI.modifyRelation(this.client, this.mid, 1);
+    assertOk(res);
   }
 
   /** 取消关注 */
   async unfollow(): Promise<void> {
-    await UserAPI.modifyRelation(this.client, this.mid, 2);
+    const res = await UserAPI.modifyRelation(this.client, this.mid, 2);
+    assertOk(res);
   }
 
   /** 拉黑该用户 */
   async block(): Promise<void> {
-    await UserAPI.modifyRelation(this.client, this.mid, 5);
+    const res = await UserAPI.modifyRelation(this.client, this.mid, 5);
+    assertOk(res);
   }
 
   /** 取消拉黑 */
   async unblock(): Promise<void> {
-    await UserAPI.modifyRelation(this.client, this.mid, 6);
+    const res = await UserAPI.modifyRelation(this.client, this.mid, 6);
+    assertOk(res);
   }
 
   /** 加入老粉计划 */
   async addContract(): Promise<void> {
-    await UserAPI.addContract(this.client, this.mid);
+    const res = await UserAPI.addContract(this.client, this.mid);
+    assertOk(res);
   }
 
   /** 老粉计划发送留言 */
   async addContractMessage(content: string): Promise<void> {
-    await UserAPI.addContractMessage(this.client, this.mid, content);
+    const res = await UserAPI.addContractMessage(this.client, this.mid, content);
+    assertOk(res);
   }
 
   /** 获取单页粉丝明细 */

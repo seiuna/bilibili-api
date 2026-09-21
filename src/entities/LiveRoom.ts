@@ -1,4 +1,5 @@
 import { BaseEntity } from './BaseEntity.js';
+import { assertOk } from '../core/client.js';
 import type { LiveRoomInfo } from '../api/live.js';
 import { LiveAPI } from '../api/live.js';
 import { MutedListEntity } from './MutedListEntity.js';
@@ -28,12 +29,14 @@ export class LiveRoom extends BaseEntity<LiveRoomInfo> {
 
   /** 更新直播间信息 */
   async update(options: { title?: string; areaId?: number; addTag?: string; delTag?: string }): Promise<void> {
-    await LiveAPI.updateRoom(this.client, this.roomId, options);
+    const res = await LiveAPI.updateRoom(this.client, this.roomId, options);
+    assertOk(res);
   }
 
   /** 禁言用户 */
   async banUser(tuid: number, hour = -1, msg?: string): Promise<void> {
-    await LiveAPI.banUser(this.client, this.roomId, tuid, hour, msg);
+    const res = await LiveAPI.banUser(this.client, this.roomId, tuid, hour, msg);
+    assertOk(res);
   }
 
   /** 获取禁言用户列表 */
@@ -44,6 +47,7 @@ export class LiveRoom extends BaseEntity<LiveRoomInfo> {
 
   /** 解禁用户 */
   async unbanUser(id: number): Promise<void> {
-    await LiveAPI.unbanUser(this.client, this.roomId, id);
+    const res = await LiveAPI.unbanUser(this.client, this.roomId, id);
+    assertOk(res);
   }
 }

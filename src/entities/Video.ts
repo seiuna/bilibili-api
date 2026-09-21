@@ -1,4 +1,5 @@
 import { BaseEntity } from './BaseEntity.js';
+import { assertOk } from '../core/client.js';
 import type { VideoInfo } from '../api/video.js';
 import { VideoAPI } from '../api/video.js';
 import { UserAPI } from '../api/user.js';
@@ -115,52 +116,56 @@ export class Video extends BaseEntity<VideoInfo> {
 
   /** 点赞视频 */
   async like(): Promise<void> {
-    await VideoAPI.like(this.client, this.aid, 1);
+    const res = await VideoAPI.like(this.client, this.aid, 1);
+    assertOk(res);
   }
 
   /** 取消点赞 */
   async unlike(): Promise<void> {
-    await VideoAPI.like(this.client, this.aid, 2);
+    const res = await VideoAPI.like(this.client, this.aid, 2);
+    assertOk(res);
   }
 
   /** 判断是否已点赞 */
   async hasLiked(): Promise<boolean> {
     const res = await VideoAPI.hasLiked(this.client, this.aid);
-    return res.data === 1;
+    return assertOk(res).data === 1;
   }
 
   /** 投币视频 */
   async coin(multiply = 1, selectLike = false): Promise<void> {
-    await VideoAPI.coin(this.client, this.aid, multiply, selectLike ? 1 : 0);
+    const res = await VideoAPI.coin(this.client, this.aid, multiply, selectLike ? 1 : 0);
+    assertOk(res);
   }
 
   /** 判断是否已投币 */
   async hasCoined(): Promise<number> {
     const res = await VideoAPI.hasCoined(this.client, this.aid);
-    return res.data.multiply;
+    return assertOk(res).data.multiply;
   }
 
   /** 收藏视频 */
   async favorite(addMediaIds: string): Promise<void> {
-    await VideoAPI.favorite(this.client, this.aid, addMediaIds);
+    const res = await VideoAPI.favorite(this.client, this.aid, addMediaIds);
+    assertOk(res);
   }
 
   /** 判断是否已收藏 */
   async hasFavorited(): Promise<boolean> {
     const res = await VideoAPI.hasFavorited(this.client, this.aid);
-    return res.data.favoured;
+    return assertOk(res).data.favoured;
   }
 
   /** 一键三连 */
   async triple(): Promise<{ like: boolean; coin: boolean; fav: boolean; multiply: number }> {
     const res = await VideoAPI.triple(this.client, this.aid);
-    return res.data;
+    return assertOk(res).data;
   }
 
   /** 分享视频 */
   async share(): Promise<number> {
     const res = await VideoAPI.share(this.client, this.aid);
-    return res.data;
+    return assertOk(res).data;
   }
 
   // ---- 评论快捷操作 ----

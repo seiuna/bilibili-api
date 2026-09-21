@@ -16,7 +16,7 @@ import {
   CommentAPI,
 } from '../api/comment.js';
 import type { UploadImageResult } from '../api/upload.js';
-import type { BiliClient } from '../core/client.js';
+import { assertOk, type BiliClient } from '../core/client.js';
 
 /**
  * 绑定到具体评论区 (oid + replyType) 的高层封装
@@ -113,31 +113,35 @@ export class CommentArea {
 
   /** 点赞 / 取消 */
   async like(rpid: number, unlike = false): Promise<BiliApiResponse<null>> {
-    return CommentAPI.like(
+    const res = await CommentAPI.like(
       this.client, this.oid, rpid, this.replyType,
       unlike ? ReplyAction.UNLIKE : ReplyAction.LIKE,
     );
+    return assertOk(res);
   }
 
   /** 点踩 / 取消 */
   async hate(rpid: number, unhate = false): Promise<BiliApiResponse<null>> {
-    return CommentAPI.hate(
+    const res = await CommentAPI.hate(
       this.client, this.oid, rpid, this.replyType,
       unhate ? ReplyHateAction.UNHATE : ReplyHateAction.HATE,
     );
+    return assertOk(res);
   }
 
   /** 删除评论 */
   async delete(rpid: number): Promise<BiliApiResponse<null>> {
-    return CommentAPI.delete(this.client, this.oid, rpid, this.replyType);
+    const res = await CommentAPI.delete(this.client, this.oid, rpid, this.replyType);
+    return assertOk(res);
   }
 
   /** 置顶 / 取消 */
   async top(rpid: number, untop = false): Promise<BiliApiResponse<null>> {
-    return CommentAPI.top(
+    const res = await CommentAPI.top(
       this.client, this.oid, rpid, this.replyType,
       untop ? ReplyTopAction.UNTOP : ReplyTopAction.TOP,
     );
+    return assertOk(res);
   }
 
   /** 举报 */
@@ -146,7 +150,8 @@ export class CommentArea {
     reason: ReplyReportReason = ReplyReportReason.SPAM,
     content?: string,
   ): Promise<BiliApiResponse<null>> {
-    return CommentAPI.report(this.client, this.oid, rpid, this.replyType, reason, content);
+    const res = await CommentAPI.report(this.client, this.oid, rpid, this.replyType, reason, content);
+    return assertOk(res);
   }
 
   /** 评论总数 */

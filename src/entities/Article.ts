@@ -1,4 +1,5 @@
 import { BaseEntity } from './BaseEntity.js';
+import { assertOk } from '../core/client.js';
 import type { ArticleInfo } from '../api/article.js';
 import { ArticleAPI } from '../api/article.js';
 import { UserAPI } from '../api/user.js';
@@ -43,21 +44,25 @@ export class Article extends BaseEntity<ArticleInfo> {
 
   /** 点赞专栏 */
   async like(): Promise<void> {
-    await ArticleAPI.like(this.client, this.cvid, 1);
+    const res = await ArticleAPI.like(this.client, this.cvid, 1);
+    assertOk(res);
   }
 
   /** 取消点赞 */
   async unlike(): Promise<void> {
-    await ArticleAPI.like(this.client, this.cvid, 2);
+    const res = await ArticleAPI.like(this.client, this.cvid, 2);
+    assertOk(res);
   }
 
   /** 投币专栏 */
   async coin(multiply = 1): Promise<void> {
-    await ArticleAPI.coin(this.client, this.cvid, this.authorMid, multiply);
+    const res = await ArticleAPI.coin(this.client, this.cvid, this.authorMid, multiply);
+    assertOk(res);
   }
 
   /** 收藏专栏 */
   async favorite(): Promise<void> {
-    await ArticleAPI.favorite(this.client, this.cvid);
+    const res = await ArticleAPI.favorite(this.client, this.cvid);
+    assertOk(res);
   }
 }
