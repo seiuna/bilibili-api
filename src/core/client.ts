@@ -386,7 +386,7 @@ export class BiliClient<T = void> {
       );
     }
     if (!headers.has('Referer')) {
-      headers.set('Referer', 'https://www.bilibili.com');
+      // headers.set('Referer', 'https://www.bilibili.com');
     }
     if (!isAnonymous) {
       if (this.config.data.cookie) {
