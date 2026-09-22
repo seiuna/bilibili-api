@@ -1,6 +1,13 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
+import type { LiveRoom } from '../entities/LiveRoom.js';
+import type { MutedUserEntity } from '../entities/MutedUserEntity.js';
 
+/**
+ * 直播间信息原始数据
+ *
+ * 实体包装见 {@link LiveRoom}。
+ */
 export interface LiveRoomInfo {
   uid: number;
   room_id: number;
@@ -27,6 +34,11 @@ export interface LiveRoomInfo {
   studio_info: unknown;
 }
 
+/**
+ * 直播间禁言用户原始数据
+ *
+ * 实体包装见 {@link MutedUserEntity}。
+ */
 export interface MutedUserItem {
   tuid: number;
   tname: string;

@@ -1,5 +1,10 @@
 import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
+import { BusinessType } from './comment.js';
+import type { ReplyNotifyItem, AtNotifyItem } from '../entities/NotifyItem.js';
+import type { AtFeedEntity } from '../entities/AtFeedEntity.js';
+import type { ReplyFeedEntity } from '../entities/ReplyFeedEntity.js';
+export { BusinessType };
 
 // ---- 枚举 ----
 
@@ -66,13 +71,25 @@ export interface ReplyUser {
   follow: boolean;
 }
 
-export interface ReplyItemDetail {
+export interface ReplyItemDetail{
   subject_id: number;
+  /**
+   * 根评论的 rpid
+   */
   root_id: number;
+  /**
+   * 当前评论的 rpid
+   */
   source_id: number;
+  /**
+   * 被回复评论的 rpid
+   */
   target_id: number;
   type: string;
-  business_id: number;
+  /**
+   * 业务类型（如 BusinessType.Video = 1, BusinessType.Dynamic = 11, BusinessType.Article = 12）
+   */
+  business_id: BusinessType | number;
   business: string;
   title: string;
   desc: string;
@@ -81,12 +98,20 @@ export interface ReplyItemDetail {
   native_uri: string;
   detail_title: string;
   root_reply_content: string;
+  topic_details: object[];
   source_content: string;
   target_reply_content: string;
+  at_details: object[];
   like_state: number;
   message: string;
+  [key: string]: any;
 }
 
+/**
+ * "回复我的" 通知原始数据
+ *
+ * 实体包装见 {@link ReplyNotifyItem}。
+ */
 export interface ReplyNotification {
   id: number;
   user: ReplyUser;
@@ -96,6 +121,11 @@ export interface ReplyNotification {
   reply_time: number;
 }
 
+/**
+ * "回复我的" 通知分页原始数据
+ *
+ * 实体包装见 {@link ReplyFeedEntity}。
+ */
 export interface ReplyFeedData {
   cursor: { is_end: boolean; id: number; time: number };
   items: ReplyNotification[];
@@ -105,7 +135,7 @@ export interface ReplyFeedData {
 export interface AtItemDetail {
   type: string;
   business: string;
-  business_id: number;
+  business_id: BusinessType | number;
   title: string;
   image: string;
   uri: string;
@@ -120,6 +150,11 @@ export interface AtItemDetail {
   hide_reply_button: boolean;
 }
 
+/**
+ * "@我的" 通知原始数据
+ *
+ * 实体包装见 {@link AtNotifyItem}。
+ */
 export interface AtNotification {
   id: number;
   user: ReplyUser;
@@ -127,6 +162,11 @@ export interface AtNotification {
   at_time: number;
 }
 
+/**
+ * "@我的" 通知分页原始数据
+ *
+ * 实体包装见 {@link AtFeedEntity}。
+ */
 export interface AtFeedData {
   cursor: { is_end: boolean; id: number; time: number };
   items: AtNotification[];
@@ -217,7 +257,7 @@ export interface MessageSettings {
 // ---- API 方法 ----
 
 export class MessageAPI {
-  /** 获取未读消息�?*/
+  /** 获取未读消息*/
   static async unreadCount(client: BiliClient<any>): Promise<BiliApiResponse<UnreadCount>> {
     return client.request('https://api.vc.bilibili.com/x/im/web/msgfeed/unread');
   }

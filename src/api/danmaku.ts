@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface DanmakuConfig {
@@ -27,8 +27,8 @@ export interface DanmakuConfig {
 export class DanmakuAPI {
   /** 获取 XML 实时弹幕 */
   static async getXmlDanmaku(client: BiliClient<any>, cid: number): Promise<string> {
-    const res = await client.request<string>(`https://comment.bilibili.com/${cid}.xml`);
-    return res;
+    const res = await client.rawRequest(`https://comment.bilibili.com/${cid}.xml`);
+    return res.text();
   }
 
   /** 获取历史弹幕日期列表 */

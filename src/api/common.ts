@@ -1,7 +1,7 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
-/** 获取当前时间戳（秒级�?*/
+/** 获取当前时间戳（秒级） */
 export function getCurrentTimestamp(): number {
   return Math.floor(Date.now() / 1000);
 }
@@ -14,58 +14,44 @@ export async function getServerTimestamp(client: BiliClient<any>): Promise<numbe
   return data.data.now;
 }
 
-// ---- BVID �?AID 转换 ----
+// ---- BVID 与 AID 转换 ----
 
 const XOR_CODE = 23442827791579n;
 const MASK_CODE = 2251799813685247n;
-const MAX_AID = 2n ** 51n;
+const MAX_AID = 1n << 51n;
 const BASE = 58n;
 
 const ALPHABET = 'FcwAPNKTMug3GV5Lj7EJnHpWsx4tb8haYeviqBz6rkCy12mUSDQX9RdoZf';
 
-/** AV 号转 BV �?*/
+/** AV 号转 BV 号 */
 export function av2bv(aid: number): string {
-  const aidBigInt = BigInt(aid);
-  const bytes = [11, 10, 3, 8, 2, 1, 7, 4, 6, 5, 9, 0];
-  const tmpArr: string[] = ['B', 'V', '1', '', '', '4', '', '1', '', '7', '', ''];
-
-  let x = (aidBigInt ^ XOR_CODE) | MAX_AID;
-  for (let i = 0; i < 6; i++) {
-    const idx = Number(x % BASE);
-    tmpArr[bytes[i]] = ALPHABET[idx];
-    x = x / BASE;
+  const bytes = ['B', 'V', '1', '0', '0', '0', '0', '0', '0', '0', '0', '0'];
+  let bvIndex = bytes.length - 1;
+  let tmp = (MAX_AID | BigInt(aid)) ^ XOR_CODE;
+  while (tmp > 0) {
+    bytes[bvIndex] = ALPHABET[Number(tmp % BASE)];
+    tmp = tmp / BASE;
+    bvIndex -= 1;
   }
-
-  // 交换 [3,9] �?[4,7]
-  [tmpArr[3], tmpArr[9]] = [tmpArr[9], tmpArr[3]];
-  [tmpArr[4], tmpArr[7]] = [tmpArr[7], tmpArr[4]];
-
-  return tmpArr.join('');
+  [bytes[3], bytes[9]] = [bytes[9], bytes[3]];
+  [bytes[4], bytes[7]] = [bytes[7], bytes[4]];
+  return bytes.join('');
 }
 
-/** BV 号转 AV �?*/
+/** BV 号转 AV 号 */
 export function bv2av(bvid: string): number {
-  const bytes = [11, 10, 3, 8, 2, 1, 7, 4, 6, 5, 9, 0];
-  const tmpArr = bvid.split('');
-
-  // 交换回来
-  [tmpArr[3], tmpArr[9]] = [tmpArr[9], tmpArr[3]];
-  [tmpArr[4], tmpArr[7]] = [tmpArr[7], tmpArr[4]];
-
-  let x = 0n;
-  for (let i = 0; i < 6; i++) {
-    const idx = ALPHABET.indexOf(tmpArr[bytes[i]]);
-    x = x * BASE + BigInt(idx);
-  }
-
-  const aid = (x & MASK_CODE) ^ XOR_CODE;
-  return Number(aid);
+  const bvidArr = Array.from(bvid);
+  [bvidArr[3], bvidArr[9]] = [bvidArr[9], bvidArr[3]];
+  [bvidArr[4], bvidArr[7]] = [bvidArr[7], bvidArr[4]];
+  bvidArr.splice(0, 3);
+  const tmp = bvidArr.reduce((pre, bvidChar) => pre * BASE + BigInt(ALPHABET.indexOf(bvidChar)), 0n);
+  return Number((tmp & MASK_CODE) ^ XOR_CODE);
 }
 
-// ---- 图片格式化工�?----
+// ---- 图片格式化工具 ----
 
 /**
- * 格式�?B 站图�?URL（添�?CDN 参数�?
+ * 格式化 B 站图片 URL（添加 CDN 参数）
  * @param url - 原始图片 URL
  * @param options - 格式化选项
  */
@@ -92,7 +78,7 @@ export function formatImageUrl(
 }
 
 /**
- * 获取图片主色�?
+ * 获取图片主色
  */
 export async function getImageAvgColor(
   client: BiliClient<any>,
@@ -103,7 +89,7 @@ export async function getImageAvgColor(
   return data.RGB;
 }
 
-// ---- 基于 IP 的地理位置查�?----
+// ---- 基于 IP 的地理位置查询 ----
 
 export interface IpLocationInfo {
   addr: string;
@@ -113,7 +99,7 @@ export interface IpLocationInfo {
 }
 
 /**
- * 基于 IP 的地理位置查�?
+ * 基于 IP 的地理位置查询
  */
 export async function getIpLocation(
   client: BiliClient<any>,
@@ -122,7 +108,7 @@ export async function getIpLocation(
   return client.request(`https://api.bilibili.com/x/web-interface/zone?ip=${ip}`);
 }
 
-// ---- CommonAPI 汇�?----
+// ---- CommonAPI 汇聚 ----
 
 export class CommonAPI {
   static getCurrentTimestamp = getCurrentTimestamp;

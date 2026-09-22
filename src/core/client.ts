@@ -41,6 +41,15 @@ import { Dynamic } from '../entities/Dynamic.js';
 import { LiveRoom } from '../entities/LiveRoom.js';
 import { FavoriteFolder } from '../entities/FavoriteFolder.js';
 import { Opus } from '../entities/Opus.js';
+import { Comment } from '../entities/Comment.js';
+import { MyInfoEntity } from '../entities/MyInfoEntity.js';
+import { NavInfoEntity } from '../entities/NavInfoEntity.js';
+import { HistoryDataEntity } from '../entities/HistoryDataEntity.js';
+import { HistoryItemEntity } from '../entities/HistoryItemEntity.js';
+import { ToViewListEntity } from '../entities/ToViewListEntity.js';
+import { AtFeedEntity } from '../entities/AtFeedEntity.js';
+import { ReplyFeedEntity } from '../entities/ReplyFeedEntity.js';
+import { AtNotifyItem, ReplyNotifyItem } from '../entities/NotifyItem.js';
 
 // ==========================================
 // 认证状态标记类型
@@ -302,7 +311,7 @@ export class BiliClient<T = void> {
     const res = await this.doRequest(fetcher, finalUrl, options);
     const data = (await res.json().catch(() => ({}))) as TData & { code?: number };
 
-    if (data.code === -101) {
+    if (data.code === -101 && this.config.data.refreshToken) {
       return this.handleCredentialRefresh(fetcher, finalUrl, options);
     }
 
@@ -370,6 +379,15 @@ export class BiliClient<T = void> {
   ): Promise<Response> {
     const isAnonymous = options.anonymous ?? (!isBilibiliHost(url));
     const headers = new Headers(options.headers);
+    if (!headers.has('User-Agent')) {
+      headers.set(
+        'User-Agent',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      );
+    }
+    if (!headers.has('Referer')) {
+      // headers.set('Referer', 'https://www.bilibili.com');
+    }
     if (!isAnonymous) {
       if (this.config.data.cookie) {
         headers.set('Cookie', this.config.data.cookie);
@@ -527,23 +545,25 @@ export class BiliClient<T = void> {
     oid: number,
     replyType: number,
     rpid: number | string,
-  ): Promise<import('../entities/Comment.js').Comment> {
+  ): Promise<Comment> {
     const res = await CommentAPI.getReply(this, oid, replyType, rpid);
     if (!res.data) {
       throw new BiliApiError(`评论 ${rpid} 不存在或未找到`, res.code || -404);
     }
-    const { Comment } = await import('../entities/Comment.js');
     return new Comment(this, res.data, oid);
   }
 
   /**
+   * @deprecated 这个可以用 但是不要用这个!
+   * 
+   * 
    * 根据评论 rpid 自动探测并获取评论实体
    * 若未提供 oid 和 replyType，会自动从候选评论区及账号最近通知中反查定位
    */
   async resolveComment(
     rpid: number | string,
     hint?: { oid?: number; replyType?: number },
-  ): Promise<import('../entities/Comment.js').Comment> {
+  ): Promise<Comment> {
     if (hint?.oid !== undefined && hint?.replyType !== undefined) {
       return this.getComment(hint.oid, hint.replyType, rpid);
     }
@@ -555,7 +575,6 @@ export class BiliClient<T = void> {
     if (!resolved) {
       throw new BiliApiError(`无法自动定位评论 ${rpid} 的上游评论区`, -404);
     }
-    const { Comment } = await import('../entities/Comment.js');
     return new Comment(this, resolved.reply, resolved.oid);
   }
 
@@ -566,17 +585,17 @@ export class BiliClient<T = void> {
   /** 获取当前登录用户空间详细信息 — 需要登录 */
   async getMyInfo(
     this: RequireAuth<T> extends never ? never : this,
-  ): Promise<import('../api/user.js').MyInfo> {
+  ): Promise<MyInfoEntity> {
     const res = await UserAPI.getMyInfo(this);
-    return res.data;
+    return new MyInfoEntity(this, res.data);
   }
 
   /** 获取登录基本信息（导航栏用户信息） — 需要登录 */
   async getNavInfo(
     this: RequireAuth<T> extends never ? never : this,
-  ): Promise<import('../api/user.js').NavInfo> {
+  ): Promise<NavInfoEntity> {
     const res = await UserAPI.getNavInfo(this);
-    return res.data;
+    return new NavInfoEntity(this, res.data);
   }
 
   /**
@@ -605,13 +624,16 @@ export class BiliClient<T = void> {
     return self.getUser(mid);
   }
 
-  /** 获取历史记录 — 需要登录 (async generator 翻页) */
-  async getHistory(
+  /** 获取历史记录 — 需要登录 (async generator 翻页，逐项返回实体) */
+  async *getHistory(
     this: RequireAuth<T> extends never ? never : this,
     ps = 20,
     type: 'all' | 'archive' | 'live' | 'article' = 'all',
-  ): Promise<AsyncGenerator<import('../api/history.js').HistoryItem>> {
-    return HistoryAPI.history(this, ps, type);
+  ): AsyncGenerator<HistoryItemEntity> {
+    const client = this as BiliClient<any>;
+    for await (const item of HistoryAPI.history(client, ps, type)) {
+      yield new HistoryItemEntity(client, item);
+    }
   }
 
   /** 获取单页历史记录 — 需要登录（游标分页） */
@@ -621,17 +643,61 @@ export class BiliClient<T = void> {
     type: 'all' | 'archive' | 'live' | 'article' = 'all',
     max?: number,
     viewAt?: number,
-  ): Promise<import('../api/history.js').HistoryData> {
+  ): Promise<HistoryDataEntity> {
     const res = await HistoryAPI.getHistory(this, ps, type, max, viewAt);
-    return res.data;
+    return new HistoryDataEntity(this, res.data);
   }
 
   /** 获取稍后再看列表 — 需要登录 */
   async getToViewList(
     this: RequireAuth<T> extends never ? never : this,
-  ): Promise<{ count: number; list: import('../api/history.js').ToViewVideo[] }> {
+  ): Promise<ToViewListEntity> {
     const res = await HistoryAPI.getToViewList(this);
-    return res.data;
+    return new ToViewListEntity(this, res.data);
+  }
+
+  // ------------------------------------------
+  // 通知（@我的 / 回复我的）门面 — 需要登录
+  // ------------------------------------------
+
+  /** 获取单页 "@我的" 通知 — 需要登录 */
+  async getAtFeedPage(
+    this: RequireAuth<T> extends never ? never : this,
+    cursorId?: number,
+    cursorTime?: number,
+  ): Promise<AtFeedEntity> {
+    const res = await MessageAPI.getAtFeed(this as BiliClient<any>, cursorId, cursorTime);
+    return new AtFeedEntity(this, res.data);
+  }
+
+  /** 获取单页 "回复我的" 通知 — 需要登录 */
+  async getReplyFeedPage(
+    this: RequireAuth<T> extends never ? never : this,
+    cursorId?: number,
+    cursorTime?: number,
+  ): Promise<ReplyFeedEntity> {
+    const res = await MessageAPI.getReplyFeed(this as BiliClient<any>, cursorId, cursorTime);
+    return new ReplyFeedEntity(this, res.data);
+  }
+
+  /** "@我的" 通知翻页 — 需要登录，逐项返回 AtNotifyItem 实体 */
+  async *atFeed(
+    this: RequireAuth<T> extends never ? never : this,
+  ): AsyncGenerator<AtNotifyItem> {
+    const client = this as BiliClient<any>;
+    for await (const item of MessageAPI.atFeed(client)) {
+      yield new AtNotifyItem(client, item);
+    }
+  }
+
+  /** "回复我的" 通知翻页 — 需要登录，逐项返回 ReplyNotifyItem 实体 */
+  async *replyFeed(
+    this: RequireAuth<T> extends never ? never : this,
+  ): AsyncGenerator<ReplyNotifyItem> {
+    const client = this as BiliClient<any>;
+    for await (const item of MessageAPI.replyFeed(client)) {
+      yield new ReplyNotifyItem(client, item);
+    }
   }
 
   /**
@@ -673,85 +739,85 @@ export class BiliClient<T = void> {
   // 子 API 懒加载 — 公开（无需登录）
   // ==========================================
 
-  private _comment: CommentAPI | null = null;
+  private _comment: typeof CommentAPI | null = null;
   /** 评论 API（读取无需登录，写操作需要登录） */
-  get comment(): CommentAPI { return this._comment ?? (this._comment = CommentAPI); }
+  get comment(): typeof CommentAPI { return this._comment ?? (this._comment = CommentAPI); }
 
-  private _search: SearchAPI | null = null;
+  private _search: typeof SearchAPI | null = null;
   /** 搜索 API */
-  get search(): SearchAPI { return this._search ?? (this._search = SearchAPI); }
+  get search(): typeof SearchAPI { return this._search ?? (this._search = SearchAPI); }
 
-  private _ranking: RankingAPI | null = null;
+  private _ranking: typeof RankingAPI | null = null;
   /** 排行 API */
-  get ranking(): RankingAPI { return this._ranking ?? (this._ranking = RankingAPI); }
+  get ranking(): typeof RankingAPI { return this._ranking ?? (this._ranking = RankingAPI); }
 
-  private _emoji: EmojiAPI | null = null;
+  private _emoji: typeof EmojiAPI | null = null;
   /** 表情 API */
-  get emoji(): EmojiAPI { return this._emoji ?? (this._emoji = EmojiAPI); }
+  get emoji(): typeof EmojiAPI { return this._emoji ?? (this._emoji = EmojiAPI); }
 
-  private _live: LiveAPI | null = null;
+  private _live: typeof LiveAPI | null = null;
   /** 直播 API（读取无需登录，管理操作需要登录） */
-  get live(): LiveAPI { return this._live ?? (this._live = LiveAPI); }
+  get live(): typeof LiveAPI { return this._live ?? (this._live = LiveAPI); }
 
-  private _dynamic: DynamicAPI | null = null;
+  private _dynamic: typeof DynamicAPI | null = null;
   /** 动态 API（读取无需登录，操作需要登录） */
-  get dynamic(): DynamicAPI { return this._dynamic ?? (this._dynamic = DynamicAPI); }
+  get dynamic(): typeof DynamicAPI { return this._dynamic ?? (this._dynamic = DynamicAPI); }
 
-  private _article: ArticleAPI | null = null;
+  private _article: typeof ArticleAPI | null = null;
   /** 专栏 API（读取无需登录，互动需要登录） */
-  get article(): ArticleAPI { return this._article ?? (this._article = ArticleAPI); }
+  get article(): typeof ArticleAPI { return this._article ?? (this._article = ArticleAPI); }
 
-  private _video: VideoAPI | null = null;
+  private _video: typeof VideoAPI | null = null;
   /** 视频 API（读取无需登录，互动需要登录） */
-  get video(): VideoAPI { return this._video ?? (this._video = VideoAPI); }
+  get video(): typeof VideoAPI { return this._video ?? (this._video = VideoAPI); }
 
-  private _user: UserAPI | null = null;
+  private _user: typeof UserAPI | null = null;
   /** 用户 API（读取无需登录，关系操作需要登录） */
-  get user(): UserAPI { return this._user ?? (this._user = UserAPI); }
+  get user(): typeof UserAPI { return this._user ?? (this._user = UserAPI); }
 
-  private _opus: OpusAPI | null = null;
+  private _opus: typeof OpusAPI | null = null;
   /** 图文 API */
-  get opus(): OpusAPI { return this._opus ?? (this._opus = OpusAPI); }
+  get opus(): typeof OpusAPI { return this._opus ?? (this._opus = OpusAPI); }
 
-  private _favorite: FavoriteAPI | null = null;
+  private _favorite: typeof FavoriteAPI | null = null;
   /** 收藏夹 API（读取无需登录，管理需要登录） */
-  get favorite(): FavoriteAPI { return this._favorite ?? (this._favorite = FavoriteAPI); }
+  get favorite(): typeof FavoriteAPI { return this._favorite ?? (this._favorite = FavoriteAPI); }
 
-  private _danmaku: DanmakuAPI | null = null;
+  private _danmaku: typeof DanmakuAPI | null = null;
   /** 弹幕 API（读取无需登录，发送/配置需要登录） */
-  get danmaku(): DanmakuAPI { return this._danmaku ?? (this._danmaku = DanmakuAPI); }
+  get danmaku(): typeof DanmakuAPI { return this._danmaku ?? (this._danmaku = DanmakuAPI); }
 
   // ==========================================
   // 子 API 懒加载 — 需要认证（HasToken）
   // ==========================================
 
-  private _message: MessageAPI | null = null;
+  private _message: typeof MessageAPI | null = null;
   /** 消息 API — 需要登录 */
-  get message(): T extends HasToken ? MessageAPI : never {
-    return (this._message ?? (this._message = MessageAPI)) as unknown as T extends HasToken ? MessageAPI : never;
+  get message(): T extends HasToken ? typeof MessageAPI : never {
+    return (this._message ?? (this._message = MessageAPI)) as unknown as T extends HasToken ? typeof MessageAPI : never;
   }
 
-  private _history: HistoryAPI | null = null;
+  private _history: typeof HistoryAPI | null = null;
   /** 历史 API — 需要登录 */
-  get history(): T extends HasToken ? HistoryAPI : never {
-    return (this._history ?? (this._history = HistoryAPI)) as unknown as T extends HasToken ? HistoryAPI : never;
+  get history(): T extends HasToken ? typeof HistoryAPI : never {
+    return (this._history ?? (this._history = HistoryAPI)) as unknown as T extends HasToken ? typeof HistoryAPI : never;
   }
 
-  private _note: NoteAPI | null = null;
+  private _note: typeof NoteAPI | null = null;
   /** 笔记 API — 需要登录 */
-  get note(): T extends HasToken ? NoteAPI : never {
-    return (this._note ?? (this._note = NoteAPI)) as unknown as T extends HasToken ? NoteAPI : never;
+  get note(): T extends HasToken ? typeof NoteAPI : never {
+    return (this._note ?? (this._note = NoteAPI)) as unknown as T extends HasToken ? typeof NoteAPI : never;
   }
 
-  private _electric: ElectricAPI | null = null;
+  private _electric: typeof ElectricAPI | null = null;
   /** 充电 API — 需要登录 */
-  get electric(): T extends HasToken ? ElectricAPI : never {
-    return (this._electric ?? (this._electric = ElectricAPI)) as unknown as T extends HasToken ? ElectricAPI : never;
+  get electric(): T extends HasToken ? typeof ElectricAPI : never {
+    return (this._electric ?? (this._electric = ElectricAPI)) as unknown as T extends HasToken ? typeof ElectricAPI : never;
   }
 
-  private _upload: UploadAPI | null = null;
+  private _upload: typeof UploadAPI | null = null;
   /** 上传 API — 需要登录 */
-  get upload(): T extends HasToken ? UploadAPI : never {
-    return (this._upload ?? (this._upload = UploadAPI)) as unknown as T extends HasToken ? UploadAPI : never;
+  get upload(): T extends HasToken ? typeof UploadAPI : never {
+    return (this._upload ?? (this._upload = UploadAPI)) as unknown as T extends HasToken ? typeof UploadAPI : never;
   }
 }

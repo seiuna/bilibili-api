@@ -7,7 +7,7 @@ export default defineConfig({
     testTimeout: 10_000,
     hookTimeout: 10_000,
     include: ['src/**/*.{test,spec}.ts'],
-    exclude: ['node_modules', 'dist'],
+    exclude: ['node_modules', 'dist', 'src/**/*.login.test.ts', 'src/**/*.write.test.ts'],
     reporters: ['verbose'],
     silent: false,
     passWithNoTests: false,

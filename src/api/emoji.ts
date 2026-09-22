@@ -1,4 +1,4 @@
-import { BiliClient } from '../index.js';
+import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface EmoteItem {
@@ -28,7 +28,7 @@ export class EmojiAPI {
   static async getPanel(
     client: BiliClient<any>,
     business: 'reply' | 'dynamic' = 'reply',
-  ): Promise<BiliApiResponse<{ packages: EmotePackage[] }>> {
+  ): Promise<BiliApiResponse<{ packages: EmotePackage[] | null }>> {
     return client.request(`https://api.bilibili.com/x/emote/user/panel/web?business=${business}`);
   }
 

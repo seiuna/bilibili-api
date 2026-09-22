@@ -1,23 +1,79 @@
 import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import { UploadAPI } from './upload.js';
+import type { Dynamic } from '../entities/Dynamic.js';
+import type { DynamicFeedItemEntity } from '../entities/DynamicFeedItemEntity.js';
+import type { DynamicSpaceEntity } from '../entities/DynamicSpaceEntity.js';
+
+/**
+ * 动态详情原始数据
+ *
+ * 实体包装见 {@link Dynamic}。
+ */
+export interface DynamicOpusPicture {
+  aigc?: unknown;
+  height: number;
+  live_url?: string | null;
+  size: number;
+  url: string;
+  width: number;
+}
+
+export interface DynamicModule {
+  module_author?: unknown;
+  module_dynamic?: {
+    additional?: unknown;
+    desc?: unknown;
+    major?: {
+      opus?: {
+        fold_action?: string[];
+        jump_url?: string;
+        pics?: DynamicOpusPicture[];
+        summary?: {
+          rich_text_nodes?: unknown[];
+          text: string;
+        };
+        title?: string | null;
+      };
+      type?: string;
+    };
+    topic?: unknown;
+  };
+  module_more?: unknown;
+  module_stat?: unknown;
+}
 
 export interface DynamicDetail {
   item: {
     basic: {
+      /**
+       * use this field to add comment to dynamic, fk bilibili.
+       */
       comment_id_str: string;
+      /**
+       * This field is always 11 for dynamic.
+       */
       comment_type: number;
+      jump_url?: string;
+      /**
+       * same as comment_id_str.
+       */
       rid_str: string;
       title?: string;
-      uid: number;
+      uid?: number;
     };
     id_str: string;
-    modules: unknown[];
+    modules: DynamicModule | DynamicModule[];
     type: string;
     visible: boolean;
   };
 }
 
+/**
+ * 动态信息流条目原始数据
+ *
+ * 实体包装见 {@link DynamicFeedItemEntity}。
+ */
 export interface DynamicFeedItem {
   basic: {
     comment_id_str: string;
@@ -33,6 +89,11 @@ export interface DynamicFeedItem {
   };
 }
 
+/**
+ * 用户空间动态列表原始数据
+ *
+ * 实体包装见 {@link DynamicSpaceEntity}。
+ */
 export interface DynamicSpaceData {
   has_more: boolean;
   items: DynamicFeedItem[];
@@ -113,6 +174,9 @@ export interface CreateDynamicResult {
   result: number;
   message?: string;
   dyn_id: number;
+  /**
+   * do not use dyn_id as dynamic ID, use dyn_id_str instead, fk bilibili
+   */
   dyn_id_str: string;
   dyn_type: number;
   dyn_rid?: number;

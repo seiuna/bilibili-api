@@ -1,5 +1,6 @@
 import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
+import type { Comment } from '../entities/Comment.js';
 
 export enum ReplyType {
   VIDEO = 1,
@@ -7,6 +8,35 @@ export enum ReplyType {
   ARTICLE = 12,
   AUDIO = 14,
   ALBUM = 16,
+  /**
+   * @deprecated Use DYNAMIC instead.
+   */
+  WORD_DYNAMIC = 17,
+  COMIC = 22,
+  COURSE = 33,
+}
+
+/**
+ * 业务类型（即评论区与消息通知中的 business_id / replyType）
+ * 对应各个业务分区的代码
+ */
+export enum BusinessType {
+  /** 视频稿件 (type = 1, oid = aid) */
+  Video = 1,
+  /** 图文动态 / 相簿 / Opus (type = 11, oid = doc_id) */
+  Dynamic = 11,
+  /** 专栏文章 (type = 12, oid = cvid) */
+  Article = 12,
+  /** 音频音乐 (type = 14, oid = auid) */
+  Audio = 14,
+  /** 相册 (type = 16) */
+  Album = 16,
+  /** 纯文字动态 (type = 17, oid = dynamic_id) */
+  WordDynamic = 17,
+  /** 漫画 (type = 22) */
+  Comic = 22,
+  /** 课程 (type = 33) */
+  Course = 33,
 }
 
 export enum ReplySort {
@@ -74,16 +104,26 @@ export interface ReplyMember {
   is_followed?: number;
 }
 
+export interface ReplyPicture {
+  img_src: string;
+  img_width: number;
+  img_height: number;
+  img_size: number;
+}
+
 export interface ReplyContent {
   message: string;
   emote?: Record<string, { id: number; text: string; url: string }>;
   jump_url?: Record<string, unknown>;
   max_line?: number;
   members?: unknown[];
+  pictures?: ReplyPicture[];
 }
 
 /**
  * 无法通过 oid: 反向查询出对应的视频/动态
+ *
+ * 实体包装见 {@link Comment}。
  */
 export interface ReplyEntry {
   /**
@@ -91,6 +131,8 @@ export interface ReplyEntry {
    * 用于唯一标识一条评论
    */
   rpid: number;
+  /** 精确的评论 ID；优先用于匹配，避免数值 ID 丢失精度。 */
+  rpid_str?: string;
 
   /**
    * 评论区所属资源 ID
@@ -105,18 +147,18 @@ export interface ReplyEntry {
   oid: number;
 
   /**
-   * 评论区类型
+   * 评论区业务类型
    *
    * 常见值：
-   * - 1：视频
-   * - 11：图文动态
-   * - 12：专栏
-   * - 14：音频
-   * - 17：动态 / 转发动态
-   * - 22：漫画
-   * - 33：课程
+   * - BusinessType.Video (1)：视频
+   * - BusinessType.Dynamic (11)：图文动态
+   * - BusinessType.Article (12)：专栏
+   * - BusinessType.Audio (14)：音频
+   * - BusinessType.WordDynamic (17)：动态 / 转发动态
+   * - BusinessType.Comic (22)：漫画
+   * - BusinessType.Course (33)：课程
    */
-  type: number;
+  type: BusinessType | number;
   mid: number;
   root: number;
   parent: number;
@@ -206,7 +248,7 @@ export class CommentAPI {
   static async getReplies(
     client: BiliClient<any>,
     oid: number,
-    replyType: number,
+    replyType: BusinessType | number,
     sort: ReplySort = ReplySort.TIME,
     nohot: 0 | 1 = 0,
     pn: number = 1,
@@ -229,7 +271,7 @@ export class CommentAPI {
   static async *replies(
     client: BiliClient<any>,
     oid: number,
-    replyType: number,
+    replyType: BusinessType | number,
     sort: ReplySort = ReplySort.TIME,
     nohot: 0 | 1 = 0,
     pageSize: number = 20,
@@ -260,7 +302,7 @@ export class CommentAPI {
   static async getRepliesWbi(
     client: BiliClient<any>,
     oid: number,
-    replyType: number,
+    replyType: BusinessType | number,
     mode: ReplyMode = ReplyMode.HEAT,
     paginationStr?: string,
   ): Promise<BiliApiResponse<ReplyWbiMainData>> {
@@ -281,7 +323,7 @@ export class CommentAPI {
   static async *repliesWbi(
     client: BiliClient<any>,
     oid: number,
-    replyType: number,
+    replyType: BusinessType | number,
     mode: ReplyMode = ReplyMode.HEAT,
   ): AsyncGenerator<{ cursor: number; comments: ReplyEntry[]; hots: ReplyEntry[] | null }> {
     let nextOffset = '';
@@ -309,7 +351,7 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rootRpid: number,
-    replyType: number,
+    replyType: BusinessType | number,
     pn: number = 1,
     pageSize: number = 20,
   ): Promise<BiliApiResponse<ReplyMainData>> {
@@ -330,7 +372,7 @@ export class CommentAPI {
     client: BiliClient<any>,
     oid: number,
     rootRpid: number,
-    replyType: number,
+    replyType: BusinessType | number,
     pageSize: number = 20,
   ): AsyncGenerator<{ page: number; comments: ReplyEntry[] }> {
     let pn = 1;
@@ -357,7 +399,7 @@ export class CommentAPI {
   static async getHotReplies(
     client: BiliClient<any>,
     oid: number,
-    replyType: number,
+    replyType: BusinessType | number,
     pn: number = 1,
     pageSize: number = 20,
   ): Promise<BiliApiResponse<ReplyMainData>> {
@@ -409,32 +451,57 @@ export class CommentAPI {
     return client.request(`https://api.bilibili.com/x/v2/reply/count?${params}`);
   }
 
-  /** 获取单条评论信息（通过 jump 定位接口） */
+  /**
+   * 在 jump 响应中定位指定评论，不会把其他评论当作目标返回。
+   * @param client 请求客户端
+   * @param oid 评论区主体 ID，例如通知的 subject_id
+   * @param replyType 评论区业务类型，例如通知的 business_id
+   * @param rpid 要查询的评论 ID（不固定对应通知的 target_id）
+   * @returns 保留上游状态；请求失败或响应中未找到目标时 data 为 null。
+   */
   static async getReply(
     client: BiliClient<any>,
-    oid: number,
+    oid: number | string,
     replyType: number,
     rpid: number | string,
-  ): Promise<BiliApiResponse<ReplyEntry>> {
+  ): Promise<BiliApiResponse<ReplyEntry | null>> {
+    for (const [name, id] of [['oid', oid], ['rpid', rpid]] as const) {
+      if (typeof id === 'number' && !Number.isSafeInteger(id)) {
+        throw new RangeError(`${name} 必须是安全整数，长 ID 请传入字符串`);
+      }
+      if (!/^[1-9]\d*$/.test(String(id).trim())) {
+        throw new TypeError(`${name} 必须是正整数 ID`);
+      }
+    }
+    const rpidStr = String(rpid).trim();
     const params = new URLSearchParams({
-      oid: String(oid),
+      oid: String(oid).trim(),
       type: String(replyType),
-      rpid: String(rpid),
+      rpid: rpidStr,
     });
-    const res = await client.request<BiliApiResponse<{ replies?: ReplyEntry[]; root?: ReplyEntry }>>(
-      `https://api.bilibili.com/x/v2/reply/jump?${params}`,
-    );
+    const res = await client.request<BiliApiResponse<{
+      replies?: ReplyEntry[] | null;
+      root?: ReplyEntry | null;
+    } | null>>(`https://api.bilibili.com/x/v2/reply/jump?${params}`);
 
-    const target =
-      res.data?.replies?.find((r) => String(r.rpid) === String(rpid)) ??
-      (res.data?.root && String(res.data.root.rpid) === String(rpid) ? res.data.root : null);
+    let target: ReplyEntry | null = null;
+    if (res.code === 0 && res.data) {
+      const stack = [...(res.data.replies ?? [])];
+      if (res.data.root) stack.push(res.data.root);
+      while (stack.length > 0) {
+        const reply = stack.pop()!;
+        const id = reply.rpid_str ?? (
+          Number.isSafeInteger(reply.rpid) ? String(reply.rpid) : undefined
+        );
+        if (id === rpidStr) {
+          target = reply;
+          break;
+        }
+        if (Array.isArray(reply.replies)) stack.push(...reply.replies);
+      }
+    }
 
-    return {
-      code: res.code,
-      message: res.message,
-      ttl: res.ttl,
-      data: target as ReplyEntry,
-    };
+    return { code: res.code, message: res.message, ttl: res.ttl, data: target };
   }
 
   /**
@@ -508,7 +575,7 @@ export class CommentAPI {
   /** 发表评论 */
   static async add(
     client: BiliClient<any>,
-    oid: number,
+    oid: number | string,
     message: string,
     replyType: number,
     root = 0,

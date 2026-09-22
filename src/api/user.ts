@@ -1,8 +1,23 @@
 import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
+import type { MyInfoEntity } from '../entities/MyInfoEntity.js';
+import type { NavInfoEntity } from '../entities/NavInfoEntity.js';
+import type { User } from '../entities/User.js';
+import type { UserStatEntity } from '../entities/UserStatEntity.js';
+import type { UpStatEntity } from '../entities/UpStatEntity.js';
+import type { NavNumEntity } from '../entities/NavNumEntity.js';
+import type { MedalWallItemEntity } from '../entities/MedalWallItemEntity.js';
+import type { MedalWallEntity } from '../entities/MedalWallEntity.js';
+import type { RelationInfoEntity } from '../entities/RelationInfoEntity.js';
+import type { RelationListEntity } from '../entities/RelationListEntity.js';
 
 // ---- 类型定义 ----
 
+/**
+ * 登录用户空间详细信息原始数据
+ *
+ * 实体包装见 {@link MyInfoEntity}。
+ */
 export interface MyInfo {
   mid: number;
   name: string;
@@ -87,6 +102,11 @@ export interface MyInfo {
   is_rip_user?: boolean;
 }
 
+/**
+ * 登录基本信息（导航栏用户信息）原始数据
+ *
+ * 实体包装见 {@link NavInfoEntity}。
+ */
 export interface NavInfo {
   isLogin: boolean;
   email_verified: number;
@@ -162,6 +182,11 @@ export interface NavInfo {
   is_jury?: boolean;
 }
 
+/**
+ * 用户原始数据
+ *
+ * 实体包装见 {@link User}。
+ */
 export interface UserInfo {
   mid: number;
   name: string;
@@ -209,6 +234,11 @@ export interface UserInfo {
   name_render: unknown;
 }
 
+/**
+ * 用户状态数原始数据
+ *
+ * 实体包装见 {@link UserStatEntity}。
+ */
 export interface UserStat {
   mid: number;
   following: number;
@@ -217,12 +247,22 @@ export interface UserStat {
   follower: number;
 }
 
+/**
+ * UP 主状态数原始数据
+ *
+ * 实体包装见 {@link UpStatEntity}。
+ */
 export interface UpStat {
   archive: { view: number };
   article: { view: number };
   likes: number;
 }
 
+/**
+ * 用户导航栏状态数原始数据
+ *
+ * 实体包装见 {@link NavNumEntity}。
+ */
 export interface NavNum {
   video: number;
   bangumi: number;
@@ -237,6 +277,11 @@ export interface NavNum {
   pugv: number;
 }
 
+/**
+ * 粉丝勋章墙单条原始数据
+ *
+ * 实体包装见 {@link MedalWallItemEntity}。
+ */
 export interface MedalWallItem {
   medal_info: {
     target_id: number;
@@ -261,6 +306,11 @@ export interface MedalWallItem {
   live_status: number;
 }
 
+/**
+ * 粉丝勋章墙原始数据
+ *
+ * 实体包装见 {@link MedalWallEntity}。
+ */
 export interface MedalWallData {
   list: MedalWallItem[];
   count: number;
@@ -272,6 +322,11 @@ export interface MedalWallData {
   level: number;
 }
 
+/**
+ * 用户关系明细单条原始数据
+ *
+ * 实体包装见 {@link RelationInfoEntity}。
+ */
 export interface RelationInfo {
   mid: number;
   attribute: number;
@@ -292,6 +347,11 @@ export interface RelationInfo {
   follow_time: number;
 }
 
+/**
+ * 用户关系列表原始数据
+ *
+ * 实体包装见 {@link RelationListEntity}。
+ */
 export interface RelationListData {
   list: RelationInfo[];
   offset: number;

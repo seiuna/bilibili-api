@@ -13,7 +13,7 @@
     "upload",
     "typescript"
   ],
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "type": "module",
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
@@ -55,8 +55,11 @@
     "build": "tsup index.ts --format esm --dts",
     "dev": "tsup index.ts --format esm --dts --watch",
     "demo": "tsx scripts/auto-reply.ts",
-    "full-test": "tsx test.ts",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
+    "test:login": "vitest run --config vitest.login.config.ts",
+    "test:write": "vitest run --config vitest.write.config.ts",
+    "test:all": "npm test && npm run test:login",
+    "typecheck": "tsc --noEmit"
   }
 }

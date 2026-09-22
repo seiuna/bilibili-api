@@ -1,6 +1,14 @@
 import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
+import type { HistoryItemEntity } from '../entities/HistoryItemEntity.js';
+import type { HistoryDataEntity } from '../entities/HistoryDataEntity.js';
+import type { ToViewVideoEntity } from '../entities/ToViewVideoEntity.js';
 
+/**
+ * 观看历史条目原始数据
+ *
+ * 实体包装见 {@link HistoryItemEntity}。
+ */
 export interface HistoryItem {
   title: string;
   cover: string;
@@ -21,12 +29,22 @@ export interface HistoryItem {
   is_fav: boolean;
 }
 
+/**
+ * 观看历史分页原始数据
+ *
+ * 实体包装见 {@link HistoryDataEntity}。
+ */
 export interface HistoryData {
   cursor: { max: number; view_at: number; business: string; ps: number };
   tab: { type: string; name: string }[];
   list: HistoryItem[];
 }
 
+/**
+ * 稍后再看视频原始数据
+ *
+ * 实体包装见 {@link ToViewVideoEntity}。
+ */
 export interface ToViewVideo {
   aid: number;
   bvid: string;

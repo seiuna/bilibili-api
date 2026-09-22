@@ -142,7 +142,9 @@ export class ConfigManager {
       const raw = await fs.readFile(this.configPath, 'utf-8');
       const parsed = JSON.parse(raw);
       this.data = { ...DEFAULT_CONFIG, ...parsed };
-    } catch {
+    } catch (error) {
+      // Never replace an existing Profile after a parse or read failure.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       if (this.isExplicitPath) {
         await this.save();
       }
