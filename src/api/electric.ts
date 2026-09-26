@@ -1,4 +1,4 @@
-import type { BiliClient } from '../core/client.js';
+import { assertOk, type BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface ChargeListItem {
@@ -108,7 +108,8 @@ export class ElectricAPI {
     let total: number | null = null;
     while (true) {
       const res = await this.getChargeRemarks(client, pn, ps);
-      if (res.code !== 0 || !res.data?.list?.length) break;
+      assertOk(res);
+      if (!res.data?.list?.length) break;
 
       if (total === null && res.data.pager?.total !== undefined) {
         total = res.data.pager.total;

@@ -25,9 +25,12 @@ export interface DanmakuConfig {
 }
 
 export class DanmakuAPI {
-  /** 获取 XML 实时弹幕 */
+  /** 获取 XML 实时弹幕；HTTP 非 2xx 或网络失败时抛出错误。 */
   static async getXmlDanmaku(client: BiliClient<any>, cid: number): Promise<string> {
     const res = await client.rawRequest(`https://comment.bilibili.com/${cid}.xml`);
+    if (!res.ok) {
+      throw new Error(`获取弹幕 XML 失败: HTTP ${res.status}`);
+    }
     return res.text();
   }
 

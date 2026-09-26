@@ -42,7 +42,7 @@ export class Dynamic extends BaseEntity<DynamicDetail['item']> {
   commentArea(): CommentArea {
     return new CommentArea(
       this.client,
-      Number(this.basic.rid_str),
+      this.basic.comment_id_str,
       this.basic.comment_type,
     );
   }

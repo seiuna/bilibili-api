@@ -1,4 +1,14 @@
 import QRCode from 'qrcode';
+import { constants, createPublicKey, publicEncrypt } from 'node:crypto';
+
+/** Raw auth transport; must not persist response cookies or retry login requests. */
+export type AuthTransport = (url: string, init?: globalThis.RequestInit) => Promise<Response>;
+
+async function authRequest(transport: AuthTransport, url: string, init?: globalThis.RequestInit): Promise<Response> {
+  const response = await transport(url, init);
+  if (!response.ok) throw new Error(`认证请求失败: HTTP ${response.status}`);
+  return response;
+}
 import type {
   BiliApiResponse,
   QrcodeGenerateData,
@@ -76,16 +86,24 @@ function extractSetCookies(headers: Headers): string | string[] {
   return headers.get('set-cookie') ?? '';
 }
 
+// Handles combined headers without splitting the comma inside Expires.
+function cookiePairs(input: string | string[]): string[] {
+  return (Array.isArray(input) ? input : [input]).flatMap(line =>
+    line.split(/,(?=\s*[^=;,\s]+=)/).map(cookie => cookie.split(';', 1)[0].trim()).filter(Boolean),
+  );
+}
+
 // ---- Web 端二维码登录 ----
 
 export async function loginByWebQrcode(
   config: ConfigManager,
   options: WebQrcodeLoginOptions = {},
+  transport: AuthTransport = fetch,
 ): Promise<QrcodeLoginResult> {
   const { pollInterval = 2000, timeout = 180_000, onStatusChange } = options;
 
   // 1. 申请二维码
-  const genRes = await fetch(
+  const genRes = await authRequest(transport,
     'https://passport.bilibili.com/x/passport-login/web/qrcode/generate',
     { method: 'GET' },
   );
@@ -94,10 +112,10 @@ export async function loginByWebQrcode(
     return { success: false, message: `申请二维码失败: HTTP ${genRes.status}` };
   }
 
+  // Generation cookies are session-local until authentication succeeds.
   const genSetCookie = extractSetCookies(genRes.headers);
-  if (Array.isArray(genSetCookie) ? genSetCookie.length > 0 : Boolean(genSetCookie)) {
-    await config.mergeCookie(genSetCookie);
-  }
+  const sessionCookies = cookiePairs(genSetCookie);
+  const pollCookie = [config.data.cookie, ...sessionCookies].filter(Boolean).join('; ');
 
   const genJson: BiliApiResponse<QrcodeGenerateData> = await genRes.json();
   if (genJson.code !== 0) {
@@ -122,14 +140,17 @@ export async function loginByWebQrcode(
     await sleep(pollInterval);
 
     const pollUrl = `https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=${encodeURIComponent(qrcode_key)}`;
-    const pollRes = await fetch(pollUrl, {
+    const pollRes = await authRequest(transport, pollUrl, {
       method: 'GET',
-      headers: { Cookie: config.data.cookie },
+      headers: { Cookie: pollCookie },
       redirect: 'manual',
     });
 
     const pollJson: BiliApiResponse<QrcodePollData | null> = await pollRes.json();
-    const dataCode = pollJson.data?.code ?? pollJson.code;
+    if (pollJson.code !== 0) {
+      return { success: false, message: `二维码轮询失败: ${pollJson.message} (code=${pollJson.code})` };
+    }
+    const dataCode = pollJson.data?.code;
 
     switch (dataCode) {
       case QrcodeStatus.NOT_SCANNED:
@@ -144,9 +165,10 @@ export async function loginByWebQrcode(
 
       case QrcodeStatus.SUCCESS: {
         const setCookie = extractSetCookies(pollRes.headers);
-        if (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) {
-          await config.setAuthCookies(setCookie);
+        if (cookiePairs(setCookie).length === 0) {
+          return { success: false, message: '登录响应缺少 Cookie' };
         }
+        await config.setAuthCookies([...sessionCookies, ...cookiePairs(setCookie)]);
 
         const refreshToken = pollJson.data?.refresh_token ?? '';
         if (refreshToken) await config.updateRefreshToken(refreshToken);
@@ -175,6 +197,7 @@ export async function loginByWebQrcode(
 export async function loginByTvQrcode(
   config: ConfigManager,
   options: TvQrcodeLoginOptions = {},
+  transport: AuthTransport = fetch,
 ): Promise<QrcodeLoginResult> {
   const {
     pollInterval = 2000,
@@ -188,7 +211,7 @@ export async function loginByTvQrcode(
   const ts = Math.floor(Date.now() / 1000);
 
   const genBody = buildSignedQuery({ local_id: localId, ts }, appkey, appsec);
-  const genRes = await fetch(
+  const genRes = await authRequest(transport,
     'https://passport.bilibili.com/x/passport-tv-login/qrcode/auth_code',
     {
       method: 'POST',
@@ -222,7 +245,7 @@ export async function loginByTvQrcode(
     const pollTs = Math.floor(Date.now() / 1000);
     const pollBody = buildSignedQuery({ auth_code, local_id: localId, ts: pollTs }, appkey, appsec);
 
-    const pollRes = await fetch(
+    const pollRes = await authRequest(transport,
       'https://passport.bilibili.com/x/passport-tv-login/qrcode/poll',
       {
         method: 'POST',
@@ -247,7 +270,7 @@ export async function loginByTvQrcode(
 
       case QrcodeStatus.SUCCESS: {
         const data = pollJson.data;
-        if (!data) return { success: false, message: '[TV] 登录返回数据为空' };
+        if (!data?.access_token || !data.refresh_token) return { success: false, message: '[TV] 登录返回凭证为空' };
 
         await config.updateTvTokens(data.access_token, data.refresh_token);
         if (data.mid) await config.updateMid(data.mid);
@@ -285,6 +308,10 @@ export interface PasswordLoginResult {
   success: boolean;
   cookie?: string;
   refreshToken?: string;
+  /** Raw server status; only 0 is accepted as completed login. */
+  status?: number;
+  /** Server-provided verification URL; never followed automatically. */
+  url?: string;
   message: string;
 }
 
@@ -299,12 +326,18 @@ export async function loginByPassword(
   username: string,
   password: string,
   options?: {
+    /** @deprecated Modern Web endpoint documents keep=0 only; this flag is ignored. */
     keep?: boolean;
-    captcha?: { challenge: string; validate: string; seccode: string };
+    captcha?: { token?: string; challenge: string; validate: string; seccode: string };
   },
+  transport: AuthTransport = fetch,
 ): Promise<PasswordLoginResult> {
+  const captcha = options?.captcha;
+  if (!captcha?.token || !captcha.challenge || !captcha.validate || !captcha.seccode) {
+    return { success: false, message: '密码登录需要完整 captcha: token/challenge/validate/seccode' };
+  }
   // 1. 获取公钥
-  const keyRes = await fetch('https://passport.bilibili.com/x/passport-login/web/key');
+  const keyRes = await authRequest(transport, 'https://passport.bilibili.com/x/passport-login/web/key');
   const keyJson: BiliApiResponse<{ hash: string; key: string }> = await keyRes.json();
 
   if (keyJson.code !== 0) {
@@ -320,7 +353,8 @@ export async function loginByPassword(
   const body = new URLSearchParams({
     username,
     password: encrypted,
-    keep: String(options?.keep ?? true),
+    keep: '0',
+    token: captcha.token,
   });
 
   if (options?.captcha) {
@@ -329,16 +363,11 @@ export async function loginByPassword(
     body.set('seccode', options.captcha.seccode);
   }
 
-  const loginRes = await fetch('https://passport.bilibili.com/x/passport-login/web/login', {
+  const loginRes = await authRequest(transport, 'https://passport.bilibili.com/x/passport-login/web/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
   });
-
-  const setCookie = extractSetCookies(loginRes.headers);
-  if (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) {
-    await config.setAuthCookies(setCookie);
-  }
 
   const loginJson: BiliApiResponse<{
     status: number;
@@ -352,6 +381,14 @@ export async function loginByPassword(
     return { success: false, message: `登录失败: ${loginJson.message} (code=${loginJson.code})` };
   }
 
+  if (loginJson.data?.status !== 0) {
+    return { success: false, status: loginJson.data?.status, url: loginJson.data?.url,
+      message: loginJson.data?.message || '登录未完成，需要额外验证或返回状态未知' };
+  }
+  const setCookie = extractSetCookies(loginRes.headers);
+  if (cookiePairs(setCookie).length === 0) return { success: false, message: '登录响应缺少 Cookie' };
+  await config.setAuthCookies(cookiePairs(setCookie));
+
   const refreshToken = loginJson.data?.refresh_token ?? '';
   if (refreshToken) await config.updateRefreshToken(refreshToken);
 
@@ -363,27 +400,14 @@ export async function loginByPassword(
   };
 }
 
-/** RSA 公钥加密（使用 Web Crypto API 或 Node crypto） */
+/** Node ESM RSA encryption with the Web endpoint's PKCS#1 v1.5 padding. */
 function cryptoPublicEncrypt(publicKeyPem: string, data: string): string {
-  // Node.js 环境
-  const { publicEncrypt, createPublicKey } = require('crypto') as typeof import('crypto');
-  try {
-    const pubKey = createPublicKey(
-      `-----BEGIN PUBLIC KEY-----\n${publicKeyPem.match(/.{1,64}/g)?.join('\n')}\n-----END PUBLIC KEY-----`,
-    );
-    const encrypted = publicEncrypt(
-      { key: pubKey, padding: 1 /* RSA_PKCS1_PADDING */ },
-      Buffer.from(data, 'utf-8'),
-    );
-    return encrypted.toString('base64');
-  } catch {
-    // 降级：直接用 PEM 字符串
-    const encrypted = publicEncrypt(
-      { key: publicKeyPem, padding: 1 },
-      Buffer.from(data, 'utf-8'),
-    );
-    return encrypted.toString('base64');
-  }
+  const pem = publicKeyPem.includes('-----BEGIN') ? publicKeyPem
+    : `-----BEGIN PUBLIC KEY-----\n${publicKeyPem.replace(/\s/g, '').match(/.{1,64}/g)?.join('\n')}\n-----END PUBLIC KEY-----`;
+  return publicEncrypt(
+    { key: createPublicKey(pem), padding: constants.RSA_PKCS1_PADDING },
+    Buffer.from(data, 'utf-8'),
+  ).toString('base64');
 }
 
 // ---- 短信登录 ----
@@ -392,6 +416,10 @@ export interface SmsLoginResult {
   success: boolean;
   cookie?: string;
   refreshToken?: string;
+  /** Raw server status; only 0 is accepted as completed login. */
+  status?: number;
+  /** Server-provided verification URL; never followed automatically. */
+  url?: string;
   message: string;
 }
 
@@ -407,18 +435,20 @@ export async function sendSmsCode(
   geeChallenge: string,
   geeValidate: string,
   geeSeccode: string,
+  transport: AuthTransport = fetch,
 ): Promise<BiliApiResponse<{ captcha_key: string }>> {
   const body = new URLSearchParams({
     cid: String(cid),
     tel: String(tel),
-    login_session_id: loginSessionId,
-    recaptcha_token: recaptchaToken,
-    gee_challenge: geeChallenge,
-    gee_validate: geeValidate,
-    gee_seccode: geeSeccode,
+    // loginSessionId remains positional for compatibility; it is APP-only.
+    source: 'main_web',
+    token: recaptchaToken,
+    challenge: geeChallenge,
+    validate: geeValidate,
+    seccode: geeSeccode,
   });
 
-  const res = await fetch('https://passport.bilibili.com/x/passport-login/web/sms/send', {
+  const res = await authRequest(transport, 'https://passport.bilibili.com/x/passport-login/web/sms/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
@@ -436,34 +466,40 @@ export async function loginBySms(
   tel: number,
   code: number,
   cid: number,
+  transport: AuthTransport = fetch,
 ): Promise<SmsLoginResult> {
   const body = new URLSearchParams({
     captcha_key: captchaKey,
     tel: String(tel),
     code: String(code),
     cid: String(cid),
+    source: 'main_web',
   });
 
-  const res = await fetch('https://passport.bilibili.com/x/passport-login/web/login/sms', {
+  const res = await authRequest(transport, 'https://passport.bilibili.com/x/passport-login/web/login/sms', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
   });
 
-  const setCookie = extractSetCookies(res.headers);
-  if (Array.isArray(setCookie) ? setCookie.length > 0 : Boolean(setCookie)) {
-    await config.setAuthCookies(setCookie);
-  }
-
   const json: BiliApiResponse<{
     status: number;
     message: string;
+    url?: string;
     refresh_token: string;
   }> = await res.json();
 
   if (json.code !== 0) {
     return { success: false, message: `短信登录失败: ${json.message} (code=${json.code})` };
   }
+
+  if (json.data?.status !== 0) {
+    return { success: false, status: json.data?.status, url: json.data?.url,
+      message: json.data?.message || '短信登录未完成或返回状态未知' };
+  }
+  const setCookie = extractSetCookies(res.headers);
+  if (cookiePairs(setCookie).length === 0) return { success: false, message: '登录响应缺少 Cookie' };
+  await config.setAuthCookies(cookiePairs(setCookie));
 
   const refreshToken = json.data?.refresh_token ?? '';
   if (refreshToken) await config.updateRefreshToken(refreshToken);
@@ -478,9 +514,9 @@ export async function loginBySms(
 
 // ---- 退出登录 ----
 
-export async function logout(config: ConfigManager): Promise<BiliApiResponse<{ redirectUrl: string }>> {
+export async function logout(config: ConfigManager, transport: AuthTransport = fetch): Promise<BiliApiResponse<{ redirectUrl: string }>> {
   const csrf = config.getCsrf();
-  const res = await fetch('https://passport.bilibili.com/login/exit/v2', {
+  const res = await authRequest(transport, 'https://passport.bilibili.com/login/exit/v2', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',

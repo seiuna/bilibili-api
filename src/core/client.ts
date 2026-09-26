@@ -192,25 +192,20 @@ export class BiliClient<T = void> {
   /** 检查登录状态 */
   async isLoggedIn(): Promise<{ loggedIn: boolean; mid?: number }> {
     if (!this.config.data.cookie) return { loggedIn: false };
-    try {
-      const data = await this.request<{
-        code: number;
-        data: { mid: number; isLogin: boolean; wbi_img?: { img_url: string; sub_url: string } };
-      }>('https://api.bilibili.com/x/web-interface/nav');
-      if (data.code === 0 && data.data?.wbi_img) {
-        const imgKey = data.data.wbi_img.img_url.split('/').pop()?.split('.')[0] ?? '';
-        const subKey = data.data.wbi_img.sub_url.split('/').pop()?.split('.')[0] ?? '';
-        if (imgKey && subKey) {
-          await this.config.updateWbiKeys(imgKey, subKey);
-        }
-      }
-      return {
-        loggedIn: data.code === 0 && (data.data?.isLogin ?? false),
-        mid: data.data?.mid,
-      };
-    } catch {
-      return { loggedIn: false };
+    const data = await this.request<{
+      code: number;
+      message?: string;
+      data: { mid: number; isLogin: boolean; wbi_img?: { img_url: string; sub_url: string } };
+    }>('https://api.bilibili.com/x/web-interface/nav');
+    if (data.code === -101) return { loggedIn: false };
+    if (data.code !== 0) throw new BiliApiError(data.message ?? '登录状态检查失败', data.code);
+    if (typeof data.data?.isLogin !== 'boolean') throw new Error('登录状态响应缺少 isLogin');
+    if (data.data.wbi_img) {
+      const imgKey = data.data.wbi_img.img_url.split('/').pop()?.split('.')[0] ?? '';
+      const subKey = data.data.wbi_img.sub_url.split('/').pop()?.split('.')[0] ?? '';
+      if (imgKey && subKey) await this.config.updateWbiKeys(imgKey, subKey);
     }
+    return { loggedIn: data.data.isLogin, mid: data.data.mid };
   }
 
   /**
@@ -220,25 +215,40 @@ export class BiliClient<T = void> {
   async ensureLogin(
     qrcodeOptions?: WebQrcodeLoginOptions,
   ): Promise<BiliClient<HasToken>> {
-    const { loggedIn, mid } = await this.isLoggedIn();
+    let status: { loggedIn: boolean; mid?: number };
+    let refreshRejected = false;
+    try {
+      status = await this.isLoggedIn();
+    } catch (error) {
+      // The nav probe is a GET: AuthRequiredError here means its post-refresh
+      // retry explicitly returned -101, not an unsafe write replay.
+      if (!(error instanceof AuthRequiredError) &&
+          !(error instanceof CredentialRefreshError && error.code === -101)) throw error;
+      status = { loggedIn: false };
+      refreshRejected = true;
+    }
+    const { loggedIn, mid } = status;
     if (loggedIn) {
       if (mid) await this.config.updateMid(mid);
-    } else if (this.config.data.refreshToken) {
+    } else if (this.config.data.refreshToken && !refreshRejected) {
+      let needsQrcode: boolean;
       try {
         const fetcher = this.customFetch ?? fetch;
         await this.performRefresh(fetcher);
         const recheck = await this.isLoggedIn();
-        if (!recheck.loggedIn) {
-          const result = await loginByWebQrcode(this.config, qrcodeOptions);
-          if (!result.success) throw new AuthRequiredError(result.message);
-        }
+        needsQrcode = !recheck.loggedIn;
       } catch (error) {
-        if (!(error instanceof CredentialRefreshError)) throw error;
-        const result = await loginByWebQrcode(this.config, qrcodeOptions);
+        if (!(error instanceof AuthRequiredError) &&
+            !(error instanceof CredentialRefreshError && error.code === -101)) throw error;
+        needsQrcode = true;
+      }
+      // Keep QR outside the refresh catch: its own failure must never retry QR.
+      if (needsQrcode) {
+        const result = await loginByWebQrcode(this.config, qrcodeOptions, this.customFetch ?? fetch);
         if (!result.success) throw new AuthRequiredError(result.message);
       }
     } else {
-      const result = await loginByWebQrcode(this.config, qrcodeOptions);
+      const result = await loginByWebQrcode(this.config, qrcodeOptions, this.customFetch ?? fetch);
       if (!result.success) throw new AuthRequiredError(result.message);
     }
     await this.ensureProfileCreated();
@@ -249,7 +259,7 @@ export class BiliClient<T = void> {
   async loginByQrcode(
     options?: WebQrcodeLoginOptions,
   ): Promise<BiliClient<HasToken>> {
-    const result = await loginByWebQrcode(this.config, options);
+    const result = await loginByWebQrcode(this.config, options, this.customFetch ?? fetch);
     if (!result.success) throw new AuthRequiredError(result.message);
     await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
@@ -259,7 +269,7 @@ export class BiliClient<T = void> {
   async loginByTvQrcode(
     options?: TvQrcodeLoginOptions,
   ): Promise<BiliClient<HasToken>> {
-    const result = await loginByTvQrcode(this.config, options);
+    const result = await loginByTvQrcode(this.config, options, this.customFetch ?? fetch);
     if (!result.success) throw new AuthRequiredError(result.message);
     await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
@@ -271,10 +281,10 @@ export class BiliClient<T = void> {
     password: string,
     options?: {
       keep?: boolean;
-      captcha?: { challenge: string; validate: string; seccode: string };
+      captcha?: { token?: string; challenge: string; validate: string; seccode: string };
     },
   ): Promise<BiliClient<HasToken>> {
-    const result = await loginByPassword(this.config, username, password, options);
+    const result = await loginByPassword(this.config, username, password, options, this.customFetch ?? fetch);
     if (!result.success) throw new AuthRequiredError(result.message);
     await this.ensureProfileCreated();
     return this as unknown as BiliClient<HasToken>;
@@ -289,7 +299,7 @@ export class BiliClient<T = void> {
 
   /** 退出登录 — 返回未认证客户端 */
   async logout(): Promise<BiliClient<void>> {
-    await logout(this.config);
+    assertOk(await logout(this.config, this.customFetch ?? fetch));
     return this as unknown as BiliClient<void>;
   }
 
@@ -307,11 +317,11 @@ export class BiliClient<T = void> {
   ): Promise<TData> {
     const fetcher = this.customFetch ?? fetch;
 
-    const finalUrl = options.wbi ? await this.injectWbiSign(url) : url;
+    const finalUrl = options.wbi ? await this.injectWbiSign(url, options.anonymous ?? !isBilibiliHost(url)) : url;
     const res = await this.doRequest(fetcher, finalUrl, options);
-    const data = (await res.json().catch(() => ({}))) as TData & { code?: number };
+    const data = (await this.readJson(res)) as TData & { code?: number };
 
-    if (data.code === -101 && this.config.data.refreshToken) {
+    if (data?.code === -101 && isBilibiliHost(finalUrl) && options.anonymous !== true && this.config.data.refreshToken) {
       return this.handleCredentialRefresh(fetcher, finalUrl, options);
     }
 
@@ -336,20 +346,16 @@ export class BiliClient<T = void> {
   // 内部方法
   // ==========================================
 
-  private async injectWbiSign(url: string): Promise<string> {
+  private async injectWbiSign(url: string, anonymous: boolean): Promise<string> {
     const urlObj = new URL(url);
-    const params: Record<string, string | number> = {};
-
-    for (const [k, v] of urlObj.searchParams) {
-      params[k] = v;
-    }
+    const params = urlObj.searchParams;
 
     let wbiKeys = this.config.getWbiKeys();
     if (!wbiKeys) {
       const navData = await this.request<{
         code: number;
         data: { wbi_img: { img_url: string; sub_url: string } };
-      }>('https://api.bilibili.com/x/web-interface/nav');
+      }>('https://api.bilibili.com/x/web-interface/nav', { anonymous });
 
       if (navData.code === 0 && navData.data?.wbi_img) {
         const imgKey = navData.data.wbi_img.img_url.split('/').pop()?.split('.')[0] ?? '';
@@ -364,11 +370,7 @@ export class BiliClient<T = void> {
     if (!wbiKeys) return url;
 
     const signed = wbiSign(params, wbiKeys.imgKey, wbiKeys.subKey);
-    const newParams = new URLSearchParams();
-    for (const [k, v] of Object.entries(signed)) {
-      newParams.set(k, v);
-    }
-    urlObj.search = newParams.toString();
+    urlObj.search = signed.toString();
     return urlObj.toString();
   }
 
@@ -388,7 +390,10 @@ export class BiliClient<T = void> {
     if (!headers.has('Referer')) {
       // headers.set('Referer', 'https://www.bilibili.com');
     }
-    if (!isAnonymous) {
+    if (isAnonymous) {
+      headers.delete('Cookie');
+      headers.delete('Authorization');
+    } else {
       if (this.config.data.cookie) {
         headers.set('Cookie', this.config.data.cookie);
       }
@@ -422,8 +427,9 @@ export class BiliClient<T = void> {
   ): Promise<any> {
     if (this.isRefreshing) {
       if (this.refreshPromise) await this.refreshPromise;
+      this.assertRefreshReplaySafe(options);
       const retryRes = await this.doRequest(fetcher, url, options);
-      const retryData = await retryRes.json();
+      const retryData = await this.readJson(retryRes);
       if (retryData.code === -101) {
         throw new AuthRequiredError('凭证刷新后重试仍返回 -101，需重新登录');
       }
@@ -440,14 +446,27 @@ export class BiliClient<T = void> {
       this.refreshPromise = null;
     }
 
+    this.assertRefreshReplaySafe(options);
     const retryRes = await this.doRequest(fetcher, url, options);
-    const retryData = await retryRes.json();
+    const retryData = await this.readJson(retryRes);
 
     if (retryData.code === -101) {
       throw new AuthRequiredError('凭证刷新后重试仍返回 -101，可能账号被风控，请重新登录');
     }
 
     return retryData;
+  }
+
+  private assertRefreshReplaySafe(options: RequestInit): void {
+    const method = (options.method ?? 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') {
+      throw new AuthRequiredError('凭证已刷新，但未自动重放非 GET/HEAD 请求；请重新构造请求（包括 CSRF）后显式重试');
+    }
+  }
+
+  private async readJson(res: Response): Promise<any> {
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`.trim());
+    return res.json();
   }
 
   private async performRefresh(fetcher: typeof fetch): Promise<void> {
@@ -466,19 +485,22 @@ export class BiliClient<T = void> {
       },
     );
 
-    const data = await res.json();
+    const data = await this.readJson(res);
 
     if (data.code !== 0) {
       throw new CredentialRefreshError(`Token 刷新被拒绝: ${data.message}`, data.code);
     }
 
-    const setCookie = res.headers.get('set-cookie');
-    if (setCookie) {
-      await this.config.updateCookie(setCookie);
-    }
-
-    if (data.data?.refresh_token) {
-      await this.config.updateRefreshToken(data.data.refresh_token);
+    const setCookies = typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : (res.headers.get('set-cookie') ?? '');
+    // Stage the rotated token before mergeCookie's save: never persist new cookies
+    // paired with the old token. This is one save, not a filesystem transaction.
+    if (data.data?.refresh_token) this.config.data.refreshToken = data.data.refresh_token;
+    if (Array.isArray(setCookies) ? setCookies.length > 0 : Boolean(setCookies)) {
+      await this.config.mergeCookie(setCookies);
+    } else if (data.data?.refresh_token) {
+      await this.config.save();
     }
   }
 
@@ -489,50 +511,50 @@ export class BiliClient<T = void> {
   /** 获取视频实体 */
   async getVideo(bvid: string): Promise<Video> {
     const rawData = await VideoAPI.getInfo(this, bvid);
-    return new Video(this, rawData.data);
+    return new Video(this, assertOk(rawData).data);
   }
 
   /** 通过 aid 获取视频实体 */
   async getVideoByAid(aid: number): Promise<Video> {
     const rawData = await VideoAPI.getInfoByAid(this, aid);
-    return new Video(this, rawData.data);
+    return new Video(this, assertOk(rawData).data);
   }
 
   /** 获取用户实体 */
   async getUser(mid: number): Promise<User> {
     const rawData = await UserAPI.getInfo(this, mid);
-    return new User(this, rawData.data);
+    return new User(this, assertOk(rawData).data);
   }
 
   /** 获取专栏实体 */
   async getArticle(cvid: number): Promise<Article> {
     const rawData = await ArticleAPI.getInfo(this, cvid);
-    (rawData.data as any)._cvid = cvid;
-    return new Article(this, rawData.data);
+    assertOk(rawData);
+    return new Article(this, rawData.data, cvid);
   }
 
   /** 获取动态实体 */
   async getDynamic(id: string): Promise<Dynamic> {
     const rawData = await DynamicAPI.getDetail(this, id);
-    return new Dynamic(this, rawData.data.item);
+    return new Dynamic(this, assertOk(rawData).data.item);
   }
 
   /** 获取直播间实体 */
   async getLiveRoom(roomId: number): Promise<LiveRoom> {
     const rawData = await LiveAPI.getRoomInfo(this, roomId);
-    return new LiveRoom(this, rawData.data);
+    return new LiveRoom(this, assertOk(rawData).data);
   }
 
   /** 获取收藏夹实体（公开收藏夹无需登录） */
   async getFavoriteFolder(mediaId: number): Promise<FavoriteFolder> {
     const rawData = await FavoriteAPI.getFolderInfo(this, mediaId);
-    return new FavoriteFolder(this, rawData.data);
+    return new FavoriteFolder(this, assertOk(rawData).data);
   }
 
   /** 获取图文实体 */
   async getOpus(id: number | string): Promise<Opus> {
     const rawData = await OpusAPI.getDetail(this, id);
-    return new Opus(this, rawData.data.item);
+    return new Opus(this, assertOk(rawData).data.item);
   }
 
   /**
@@ -542,11 +564,12 @@ export class BiliClient<T = void> {
    * @param rpid 评论 ID
    */
   async getComment(
-    oid: number,
+    oid: number | string,
     replyType: number,
     rpid: number | string,
   ): Promise<Comment> {
     const res = await CommentAPI.getReply(this, oid, replyType, rpid);
+    assertOk(res);
     if (!res.data) {
       throw new BiliApiError(`评论 ${rpid} 不存在或未找到`, res.code || -404);
     }
@@ -562,7 +585,7 @@ export class BiliClient<T = void> {
    */
   async resolveComment(
     rpid: number | string,
-    hint?: { oid?: number; replyType?: number },
+    hint?: { oid?: number | string; replyType?: number },
   ): Promise<Comment> {
     if (hint?.oid !== undefined && hint?.replyType !== undefined) {
       return this.getComment(hint.oid, hint.replyType, rpid);
@@ -587,7 +610,7 @@ export class BiliClient<T = void> {
     this: RequireAuth<T> extends never ? never : this,
   ): Promise<MyInfoEntity> {
     const res = await UserAPI.getMyInfo(this);
-    return new MyInfoEntity(this, res.data);
+    return new MyInfoEntity(this, assertOk(res).data);
   }
 
   /** 获取登录基本信息（导航栏用户信息） — 需要登录 */
@@ -595,7 +618,7 @@ export class BiliClient<T = void> {
     this: RequireAuth<T> extends never ? never : this,
   ): Promise<NavInfoEntity> {
     const res = await UserAPI.getNavInfo(this);
-    return new NavInfoEntity(this, res.data);
+    return new NavInfoEntity(this, assertOk(res).data);
   }
 
   /**
@@ -643,9 +666,10 @@ export class BiliClient<T = void> {
     type: 'all' | 'archive' | 'live' | 'article' = 'all',
     max?: number,
     viewAt?: number,
+    business?: string,
   ): Promise<HistoryDataEntity> {
-    const res = await HistoryAPI.getHistory(this, ps, type, max, viewAt);
-    return new HistoryDataEntity(this, res.data);
+    const res = await HistoryAPI.getHistory(this, ps, type, max, viewAt, business);
+    return new HistoryDataEntity(this, assertOk(res).data);
   }
 
   /** 获取稍后再看列表 — 需要登录 */
@@ -653,7 +677,7 @@ export class BiliClient<T = void> {
     this: RequireAuth<T> extends never ? never : this,
   ): Promise<ToViewListEntity> {
     const res = await HistoryAPI.getToViewList(this);
-    return new ToViewListEntity(this, res.data);
+    return new ToViewListEntity(this, assertOk(res).data);
   }
 
   // ------------------------------------------
@@ -667,7 +691,7 @@ export class BiliClient<T = void> {
     cursorTime?: number,
   ): Promise<AtFeedEntity> {
     const res = await MessageAPI.getAtFeed(this as BiliClient<any>, cursorId, cursorTime);
-    return new AtFeedEntity(this, res.data);
+    return new AtFeedEntity(this, assertOk(res).data);
   }
 
   /** 获取单页 "回复我的" 通知 — 需要登录 */
@@ -677,7 +701,7 @@ export class BiliClient<T = void> {
     cursorTime?: number,
   ): Promise<ReplyFeedEntity> {
     const res = await MessageAPI.getReplyFeed(this as BiliClient<any>, cursorId, cursorTime);
-    return new ReplyFeedEntity(this, res.data);
+    return new ReplyFeedEntity(this, assertOk(res).data);
   }
 
   /** "@我的" 通知翻页 — 需要登录，逐项返回 AtNotifyItem 实体 */

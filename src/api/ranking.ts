@@ -1,4 +1,4 @@
-import type { BiliClient } from '../core/client.js';
+import { assertOk, type BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import type { RecommendVideo } from './video.js';
 
@@ -34,7 +34,8 @@ export class RankingAPI {
     while (true) {
       if (maxPages !== undefined && pn > maxPages) break;
       const res = await this.getPopular(client, pn, ps);
-      if (res.code !== 0 || !res.data?.list?.length) break;
+      assertOk(res);
+      if (!res.data?.list?.length) break;
 
       for (const item of res.data.list) yield item;
 

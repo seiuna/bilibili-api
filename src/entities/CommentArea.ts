@@ -1,4 +1,4 @@
-import type { BiliApiResponse } from '../core/types.js';
+import { normalizeCommentId, type BiliApiResponse } from '../core/types.js';
 import type {
   ReplyEntry,
   ReplyAddResult,
@@ -24,11 +24,11 @@ import { assertOk, type BiliClient } from '../core/client.js';
 export class CommentArea {
   constructor(
     private client: BiliClient<any>,
-    private oid: number,
+    private oid: number | string,
     private replyType: number,
-  ) {}
+  ) { normalizeCommentId(oid, 'oid'); }
 
-  get getOid(): number { return this.oid; }
+  get getOid(): number | string { return this.oid; }
   get getReplyType(): number { return this.replyType; }
 
   /** 获取单页评论 */
@@ -68,6 +68,7 @@ export class CommentArea {
   /** 获取单条评论实体 */
   async getReply(rpid: number | string): Promise<import('./Comment.js').Comment | null> {
     const res = await CommentAPI.getReply(this.client, this.oid, this.replyType, rpid);
+    assertOk(res);
     if (!res.data) return null;
     const { Comment } = await import('./Comment.js');
     return new Comment(this.client, res.data, this.oid);
@@ -76,20 +77,22 @@ export class CommentArea {
   /** 发表评论（支持图片） */
   async add(
     message: string,
-    root = 0,
-    parent = 0,
+    root: number | string = 0,
+    parent: number | string = 0,
     pictures?: UploadImageResult[],
   ): Promise<BiliApiResponse<ReplyAddResult>> {
     const csrf = this.client.config.getCsrf();
     const body = new URLSearchParams({
       type: String(this.replyType),
-      oid: String(this.oid),
+      oid: normalizeCommentId(this.oid, 'oid'),
       message,
       plat: '1',
       csrf,
     });
-    if (root > 0) body.set('root', String(root));
-    if (parent > 0) body.set('parent', String(parent));
+    const rootId = normalizeCommentId(root, 'root', true);
+    const parentId = normalizeCommentId(parent, 'parent', true);
+    if (rootId !== '0') body.set('root', rootId);
+    if (parentId !== '0') body.set('parent', parentId);
     if (pictures && pictures.length > 0) {
       const mapped = pictures.map(p => ({
         img_src: p.image_url,
@@ -112,7 +115,7 @@ export class CommentArea {
   }
 
   /** 点赞 / 取消 */
-  async like(rpid: number, unlike = false): Promise<BiliApiResponse<null>> {
+  async like(rpid: number | string, unlike = false): Promise<BiliApiResponse<null>> {
     const res = await CommentAPI.like(
       this.client, this.oid, rpid, this.replyType,
       unlike ? ReplyAction.UNLIKE : ReplyAction.LIKE,
@@ -121,7 +124,7 @@ export class CommentArea {
   }
 
   /** 点踩 / 取消 */
-  async hate(rpid: number, unhate = false): Promise<BiliApiResponse<null>> {
+  async hate(rpid: number | string, unhate = false): Promise<BiliApiResponse<null>> {
     const res = await CommentAPI.hate(
       this.client, this.oid, rpid, this.replyType,
       unhate ? ReplyHateAction.UNHATE : ReplyHateAction.HATE,
@@ -130,13 +133,13 @@ export class CommentArea {
   }
 
   /** 删除评论 */
-  async delete(rpid: number): Promise<BiliApiResponse<null>> {
+  async delete(rpid: number | string): Promise<BiliApiResponse<null>> {
     const res = await CommentAPI.delete(this.client, this.oid, rpid, this.replyType);
     return assertOk(res);
   }
 
   /** 置顶 / 取消 */
-  async top(rpid: number, untop = false): Promise<BiliApiResponse<null>> {
+  async top(rpid: number | string, untop = false): Promise<BiliApiResponse<null>> {
     const res = await CommentAPI.top(
       this.client, this.oid, rpid, this.replyType,
       untop ? ReplyTopAction.UNTOP : ReplyTopAction.TOP,
@@ -146,7 +149,7 @@ export class CommentArea {
 
   /** 举报 */
   async report(
-    rpid: number,
+    rpid: number | string,
     reason: ReplyReportReason = ReplyReportReason.SPAM,
     content?: string,
   ): Promise<BiliApiResponse<null>> {

@@ -46,7 +46,7 @@ export class Video extends BaseEntity<VideoInfo> {
   /** 获取 UP 主信息 */
   async getAuthor(): Promise<User> {
     const res = await UserAPI.getInfo(this.client, this.owner.mid);
-    return new User(this.client, res.data);
+    return new User(this.client, assertOk(res).data);
   }
 
   /** 获取视频评论区 */
@@ -57,7 +57,7 @@ export class Video extends BaseEntity<VideoInfo> {
   /** 获取视频状态数 */
   async getStat(): Promise<VideoStatEntity> {
     const res = await VideoAPI.getStat(this.client, this.bvid, this.aid);
-    return new VideoStatEntity(this.client, res.data);
+    return new VideoStatEntity(this.client, assertOk(res).data);
   }
 
   /** 获取视频流播放 & 下载地址 */
@@ -73,25 +73,25 @@ export class Video extends BaseEntity<VideoInfo> {
       bvid: this.bvid,
       ...options,
     });
-    return new PlayUrlEntity(this.client, res.data);
+    return new PlayUrlEntity(this.client, assertOk(res).data);
   }
 
   /** 获取视频在线人数 */
   async getOnlineCount(): Promise<OnlineCountEntity> {
     const res = await VideoAPI.getOnlineCount(this.client, this.cid, this.aid, this.bvid);
-    return new OnlineCountEntity(this.client, res.data);
+    return new OnlineCountEntity(this.client, assertOk(res).data);
   }
 
   /** 获取视频 AI 摘要 */
   async getAiSummary(): Promise<AiSummaryEntity> {
     const res = await VideoAPI.getAiSummary(this.client, this.cid, this.aid, this.bvid, this.owner.mid);
-    return new AiSummaryEntity(this.client, res.data);
+    return new AiSummaryEntity(this.client, assertOk(res).data);
   }
 
   /** 获取视频快照 */
   async getSnapshot(index = 0): Promise<VideoSnapshotEntity> {
     const res = await VideoAPI.getSnapshot(this.client, this.cid, this.aid, this.bvid, index);
-    return new VideoSnapshotEntity(this.client, res.data);
+    return new VideoSnapshotEntity(this.client, assertOk(res).data);
   }
 
   /** 获取高能进度条数据 */
@@ -103,13 +103,13 @@ export class Video extends BaseEntity<VideoInfo> {
   /** 获取视频推荐列表 */
   async getRecommend(): Promise<RecommendVideoEntity[]> {
     const res = await VideoAPI.getRecommend(this.client, this.aid, this.bvid);
-    return (res.data ?? []).map((item) => new RecommendVideoEntity(this.client, item));
+    return assertOk(res).data.map((item) => new RecommendVideoEntity(this.client, item));
   }
 
   /** 获取视频 TAG */
   async getTags(): Promise<VideoTagEntity[]> {
     const res = await VideoAPI.getTags(this.client, this.aid, this.bvid, this.cid);
-    return (res.data ?? []).map((item) => new VideoTagEntity(this.client, item));
+    return assertOk(res).data.map((item) => new VideoTagEntity(this.client, item));
   }
 
   // ---- 互动操作 ----

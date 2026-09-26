@@ -1,6 +1,6 @@
 import { BaseEntity } from './BaseEntity.js';
 import type { BiliClient } from '../core/client.js';
-import type { BiliApiResponse } from '../core/types.js';
+import { normalizeCommentId, type BiliApiResponse } from '../core/types.js';
 import type { ReplyEntry, ReplyAddResult } from '../api/comment.js';
 import { BusinessType, ReplyType, ReplyReportReason } from '../api/comment.js';
 import { CommentArea } from './CommentArea.js';
@@ -15,12 +15,18 @@ import { DynamicAPI } from '../api/dynamic.js';
  * 原始数据类型见 {@link ReplyEntry}。
  */
 export class Comment extends BaseEntity<ReplyEntry> {
-  private _oid: number;
+  private _oid: number | string;
 
-  constructor(client: BiliClient<any>, entry: ReplyEntry, oid: number) {
+  constructor(client: BiliClient<any>, entry: ReplyEntry, oid: number | string) {
     super(client, entry);
     this._oid = oid;
   }
+
+  /** Exact IDs: authoritative *_str fields win; unsafe numeric fallbacks throw. */
+  get rpidStr(): string { return normalizeCommentId(this.rawData.rpid_str ?? this.rpid, 'rpid'); }
+  get oidStr(): string { return normalizeCommentId(this.rawData.oid_str ?? this._oid, 'oid'); }
+  get rootStr(): string { return normalizeCommentId(this.rawData.root_str ?? this.root, 'root', true); }
+  get parentStr(): string { return normalizeCommentId(this.rawData.parent_str ?? this.parent, 'parent', true); }
 
   get rpid(): number { return this.rawData.rpid; }
   get oid(): number { return this.rawData.oid; }
@@ -72,7 +78,7 @@ export class Comment extends BaseEntity<ReplyEntry> {
 
   /** 该评论所属评论区，使用原始 type */
   commentArea(): CommentArea {
-    return new CommentArea(this.client, this._oid, this.type);
+    return new CommentArea(this.client, this.oidStr, this.type);
   }
 
   /** 获取该评论所属视频（仅 type=1） */
@@ -89,7 +95,8 @@ export class Comment extends BaseEntity<ReplyEntry> {
    * 获取该评论所属的纯文字动态（仅 type=17）。
    *
    * type=11 表示图文动态 / 相簿，其 oid 是 doc_id，不能直接作为动态 ID
-   * 调用详情接口。优先使用 dynamic_id_str，仅在 oid 为正的安全整数时回退；
+   * 调用详情接口。优先使用 dynamic_id_str、oid_str 或调用方字符串 oid，
+   * 最后仅在数值 oid 为正的安全整数时回退；
    * 缺少可靠 ID 时抛出错误，不发送可能已丢失精度的 ID。
    */
   async getDynamic(): Promise<Dynamic> {
@@ -100,6 +107,10 @@ export class Comment extends BaseEntity<ReplyEntry> {
     let dynamicId: string;
     if (stringId && /^[1-9]\d*$/.test(stringId)) {
       dynamicId = stringId;
+    } else if (this.rawData.oid_str !== undefined) {
+      dynamicId = normalizeCommentId(this.rawData.oid_str, 'oid');
+    } else if (typeof this._oid === 'string') {
+      dynamicId = normalizeCommentId(this._oid, 'oid');
     } else if (Number.isSafeInteger(this.oid) && this.oid > 0) {
       dynamicId = String(this.oid);
     } else {
@@ -120,24 +131,24 @@ export class Comment extends BaseEntity<ReplyEntry> {
 
   /** 回复这条评论 */
   async reply(message: string, pictures?: UploadImageResult[]): Promise<BiliApiResponse<ReplyAddResult>> {
-    const root = this.root === 0 ? this.rpid : this.root;
-    return this._c.add(message, root, this.rpid, pictures);
+    const root = this.rootStr === '0' ? this.rpidStr : this.rootStr;
+    return this._c.add(message, root, this.rpidStr, pictures);
   }
 
   /** 点赞 / 取消 */
-  async like(unlike = false) { return this._c.like(this.rpid, unlike); }
+  async like(unlike = false) { return this._c.like(this.rpidStr, unlike); }
 
   /** 点踩 / 取消 */
-  async hate(unhate = false) { return this._c.hate(this.rpid, unhate); }
+  async hate(unhate = false) { return this._c.hate(this.rpidStr, unhate); }
 
   /** 删除 */
-  async delete() { return this._c.delete(this.rpid); }
+  async delete() { return this._c.delete(this.rpidStr); }
 
   /** 置顶 / 取消 */
-  async top(untop = false) { return this._c.top(this.rpid, untop); }
+  async top(untop = false) { return this._c.top(this.rpidStr, untop); }
 
   /** 举报 */
   async report(reason = ReplyReportReason.SPAM, content?: string) {
-    return this._c.report(this.rpid, reason, content);
+    return this._c.report(this.rpidStr, reason, content);
   }
 }

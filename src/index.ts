@@ -19,6 +19,7 @@ export {
   logout,
 } from './core/auth.js';
 export type {
+  AuthTransport,
   QrcodeLoginResult,
   QrcodeStatusCallback,
   WebQrcodeLoginOptions,
@@ -66,6 +67,10 @@ export type {
   MedalWallItem,
   RelationInfo,
   RelationListData,
+  UserSubmission,
+  UserSubmissionsData,
+  UserFollowing,
+  UserFollowingsData,
   NameToUidItem,
   LoginNoticeData,
   LoginLogItem,
@@ -80,6 +85,7 @@ export type {
   ReplyMember,
   ReplyContent,
   ReplyMainData,
+  ReplyDialogData,
   ReplyWbiMainData,
   ReplyAddResult,
   ReplyPage,
@@ -101,6 +107,8 @@ export type { ArticleInfo, ArticleView, ArticleCollection } from './api/article.
 export { DynamicAPI } from './api/dynamic.js';
 export type {
   DynamicDetail,
+  DynamicModule,
+  DynamicOpusPicture,
   DynamicSpaceData,
   DynamicFeedItem,
   VoteOptionItem,
@@ -116,6 +124,9 @@ export type {
 export { MessageAPI } from './api/message.js';
 export type {
   UnreadCount,
+  ReplyUser,
+  ReplyItemDetail,
+  AtItemDetail,
   ReplyNotification,
   AtNotification,
   AtFeedData,
@@ -136,13 +147,13 @@ export {
 } from './api/message.js';
 
 export { SearchAPI } from './api/search.js';
-export type { SearchAllData, HotSearchData, DefaultSearchData, SuggestItem } from './api/search.js';
+export type { SearchResult, SearchAllData, HotSearchItem, HotSearchData, DefaultSearchData, SuggestItem } from './api/search.js';
 
 export { HistoryAPI } from './api/history.js';
 export type { HistoryItem, HistoryData, ToViewVideo } from './api/history.js';
 
 export { FavoriteAPI } from './api/favorite.js';
-export type { FavoriteFolderData, FavoriteMedia, FavoriteListData } from './api/favorite.js';
+export type { FavoriteFolderListItem, FavoriteFolderData, FavoriteMedia, FavoriteListData } from './api/favorite.js';
 
 export { DanmakuAPI } from './api/danmaku.js';
 export type { DanmakuConfig } from './api/danmaku.js';
