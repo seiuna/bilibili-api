@@ -10,6 +10,16 @@
 
 </div>
 
+## API 修复与安全约定
+
+- [用户投稿与关注列表：参数、返回字段及 WBI](./docs/user-lists.md)
+- [评论 ID 精度、回复对话类型和实体行为](./docs/comment-identifiers.md)
+- [历史记录删除边界与游标分页](./docs/history-safety.md)
+- [文章身份与视频/文章读取错误](./docs/article-video-read-safety.md)
+- [分页与原始响应契约](./docs/api-pagination-contracts.md)
+- [认证流程与传输约定](./docs/authentication.md)
+- [HTTP、匿名请求、凭证刷新及 WBI 边界](./docs/transport.md)
+
 ## 测试
 
 | 命令 | 范围 |
@@ -49,7 +59,7 @@ $env:ENABLE_WRITE_TESTS = '1'
 npm run test:write
 ```
 
-`test:write` 使用独立的 `vitest.write.config.ts`，未设置写开关会失败而不是静默跳过。不自动扫码，测试本身不额外重试发动态或评论；但 SDK 在响应为 `-101` 且存在刷新令牌时，仍会刷新凭证并重试原请求（包括写请求）。刷新后仍失败、其他远端错误、风控或内容尚未可读都会使测试失败。请使用专用测试账号。`CommentAPI.add` 和 `CommentAPI.getReply` 的 `oid` 参数支持 `number | string`，动态评论区应传入字符串 ID，不要转成 `number`。
+`test:write` 使用独立的 `vitest.write.config.ts`，未设置写开关会失败而不是静默跳过。不自动扫码，测试本身不额外重试发动态或评论。SDK 遇到 `-101` 且存在刷新令牌时会尝试刷新；只自动重试 GET/HEAD，写请求会抛出 `AuthRequiredError`，调用者必须用新 CSRF 重建请求并明确决定是否重试。刷新后仍失败、其他远端错误、风控或内容尚未可读都会使测试失败。请使用专用测试账号。`CommentAPI.add` 和 `CommentAPI.getReply` 的 `oid` 参数支持 `number | string`，动态评论区应传入字符串 ID，不要转成 `number`。
 
 ## 安装
 
@@ -186,7 +196,7 @@ src/
 
 底层子 API 以**静态类（Static Classes）**方式提供。多数普通 JSON 请求方法以 `client` 实例为第一个参数，返回 `Promise<BiliApiResponse<T>>`，但以下方法使用不同的契约：
 
-- `DanmakuAPI.getXmlDanmaku(client, cid)` 返回 `Promise<string>`（XML 文本）。
+- `DanmakuAPI.getXmlDanmaku(client, cid)` 返回 `Promise<string>`（XML 文本）；HTTP 非 2xx 和网络错误会抛出，不会把错误页当作空弹幕池。该方法不额外校验成功响应的 XML 结构。
 - `SearchAPI.getSuggest(client, term)` 返回包含 `code` 和 `result.tag` 的对象（由 Promise 包装），而不是标准的 `data` 包装。
 - 分页方法（如 `MessageAPI.sessions(client)`）返回 `AsyncGenerator`，通过 `for await...of` 消费。
 - `CommonAPI.av2bv(aid)`、`CommonAPI.bv2av(bvid)`、`CommonAPI.getCurrentTimestamp()` 等纯工具方法不接收 `client`。
@@ -255,7 +265,7 @@ const authed = await client.ensureLogin({
     if (terminal) console.log(terminal);
   },
 });
-// 优先序：已有 cookie → refresh_token 刷新 → 弹出二维码
+// 仅明确未登录或凭证失效时尝试刷新/二维码；网络、HTTP、解析与其他业务错误直接抛出。
 ```
 
 ### 密码登录
@@ -347,7 +357,7 @@ console.log(`rpid=${data.rpid}`);
 await area.add('回复内容', rootRpid, parentRpid);
 
 // 上传图片后发表带图评论
-const img = await authed.upload.image('./cat.png');
+const img = await authed.upload.image(authed, './cat.png');
 await area.add('带图评论', 0, 0, [img.data]);
 ```
 
@@ -478,6 +488,8 @@ const result = await SearchAPI.searchAll(client, 'meow');
 
 // 热搜
 const hot = await SearchAPI.getHotSearch(client, 10);
+// 原始响应保留 trending 层级；非零 code 应使用 assertOk 检查。
+const hotWords = hot.data.trending.list;
 
 // 搜索建议
 const suggest = await SearchAPI.getSuggest(client, 'bilibili');

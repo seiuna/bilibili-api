@@ -19,12 +19,12 @@
 
 ## 架构边界
 
-- `src/client.ts`：`BiliClient` 是统一客户端，所有子 API 通过懒加载 getter 访问（`client.comment`、`client.chat`、`client.space`、`client.upload`、`client.notify`）。
+- `src/core/client.ts`：`BiliClient` 是统一客户端，子 API 通过懒加载 getter 访问（如 `client.comment`、`client.message`、`client.user`、`client.upload`）。getter 返回静态 API 类，调用时仍须显式传入 client。
 - `src/api/comment.ts`：`CommentAPI` 是**底层原始 API 封装**，方法需要显式传入 `oid / type / rpid`，返回原始 `BiliApiResponse`。
-- `src/api/comment-area.ts`：`CommentArea` 是**高层封装**，绑定到具体评论区 `(oid, replyType)`，默认把操作委托给 `CommentAPI`；只有 `add()` 自己实现，因为需要支持图片。
+- `src/entities/CommentArea.ts`：`CommentArea` 是**高层封装**，绑定到具体评论区 `(oid, replyType)`，默认把操作委托给 `CommentAPI`；`add()` 自己实现以支持图片。
 - `CommentArea` 构造时必须显式传入 `replyType`，不再有默认 `11`。
-- `CommentResult.commentArea()` 使用评论原始 `type`，不再硬编码为 `1`。
-- `src/queries/` 里的 `VideoQuery` / `CommentQuery` / `UserQuery` / `*Result` 负责链式查询；`VideoQuery.getComment()` 已删除（会把 `bvid` 错当成 `oid`）。
+- `Comment.commentArea()` 使用评论原始 `type`，不再硬编码为 `1`。
+- `src/entities/` 中的 `Video` / `Comment` / `User` 等实体封装原始数据和后续操作；旧 `src/queries/` 与 `*Query` / `*Result` 已移除。
 
 ## 凭证与配置文件
 

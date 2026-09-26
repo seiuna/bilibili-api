@@ -71,7 +71,7 @@ export function formatImageUrl(
   if (options.quality) parts.push(`${options.quality}q`);
   if (options.crop !== undefined) parts.push(`${options.crop}c`);
 
-  const suffix = parts.length > 0 ? `@${parts.join('_')}` : '';
+  const suffix = parts.length > 0 || options.format ? `@${parts.join('_')}` : '';
   const format = options.format ? `.${options.format}` : '';
 
   return `${url}${suffix}${format}`;

@@ -1,3 +1,15 @@
+/** Normalize comment IDs without rounding; zero is only valid for root/parent sentinels. */
+export function normalizeCommentId(id: string | number, name = 'id', allowZero = false): string {
+  if (typeof id === 'number' && !Number.isSafeInteger(id)) {
+    throw new RangeError(`${name} 必须是安全整数，长 ID 请传入字符串`);
+  }
+  const value = String(id).trim();
+  if (!(allowZero ? /^(0|[1-9]\d*)$/ : /^[1-9]\d*$/).test(value)) {
+    throw new TypeError(`${name} 必须是${allowZero ? '非负' : '正'}整数 ID`);
+  }
+  return value;
+}
+
 export interface BiliApiResponse<T = unknown> {
   code: number;
   message: string;

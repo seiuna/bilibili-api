@@ -23,6 +23,6 @@ export class Opus extends BaseEntity<OpusDetail['item']> {
 
   /** 获取该图文的评论区 */
   commentArea(): CommentArea {
-    return new CommentArea(this.client, Number(this.rid), this.commentType);
+    return new CommentArea(this.client, this.commentId, this.commentType);
   }
 }

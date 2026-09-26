@@ -64,34 +64,25 @@ function getMixinKey(rawWbiKey: string): string {
  * @param subKey - 从 nav 接口获取的 sub_key
  * @returns 添加了 w_rid 和 wts 的参数对象
  */
+export function wbiSign(params: URLSearchParams, imgKey: string, subKey: string): URLSearchParams;
+export function wbiSign(params: Record<string, string | number>, imgKey: string, subKey: string): Record<string, string>;
 export function wbiSign(
-  params: Record<string, string | number>,
+  params: Record<string, string | number> | URLSearchParams,
   imgKey: string,
   subKey: string,
-): Record<string, string> {
+): Record<string, string> | URLSearchParams {
   const mixinKey = getMixinKey(imgKey + subKey);
-  const wts = Math.floor(Date.now() / 1000);
-
-  // 添加 wts，按键名升序排序
-  const sortedParams: Record<string, string> = {};
-  const allParams: Record<string, string | number> = { ...params, wts };
-  for (const key of Object.keys(allParams).sort()) {
-    // 过滤 value 中的 "!'()*" 字符
-    const val = String(allParams[key]).replace(/[!'()*]/g, '');
-    sortedParams[key] = val;
-  }
-
-  // 百分号编码（大写），空格编码为 %20
-  const query = Object.entries(sortedParams)
-    .map(
-      ([k, v]) =>
-        `${encodeURIComponent(k)}=${encodeURIComponent(v).replace(/%20/g, '%20')}`,
-    )
-    .join('&');
-
+  const entries = params instanceof URLSearchParams ? [...params] : Object.entries(params);
+  // Replace stale signature fields; stable sorting preserves duplicate-value order.
+  const sorted = entries
+    .filter(([key]) => key !== 'w_rid' && key !== 'wts')
+    .map(([key, value]) => [key, String(value).replace(/[!'()*]/g, '')] as [string, string]);
+  sorted.push(['wts', String(Math.floor(Date.now() / 1000))]);
+  sorted.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  const query = sorted.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
   const wRid = crypto.createHash('md5').update(query + mixinKey).digest('hex');
-
-  return { ...sortedParams, w_rid: wRid };
+  sorted.push(['w_rid', wRid]);
+  return params instanceof URLSearchParams ? new URLSearchParams(sorted) : Object.fromEntries(sorted);
 }
 
 /**

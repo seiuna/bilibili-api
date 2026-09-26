@@ -27,9 +27,13 @@ export interface HotSearchItem {
 }
 
 export interface HotSearchData {
-  title: string;
-  trackid: string;
-  list: HotSearchItem[];
+  trending: {
+    title: string;
+    trackid: string;
+    list: HotSearchItem[];
+    /** 上游文档仅提供空数组，非空条目结构尚未确认。 */
+    top_list: unknown[];
+  };
 }
 
 export interface DefaultSearchData {

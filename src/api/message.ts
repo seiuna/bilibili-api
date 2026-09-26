@@ -1,4 +1,4 @@
-import type { BiliClient } from '../core/client.js';
+import { assertOk, type BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import { BusinessType } from './comment.js';
 import type { ReplyNotifyItem, AtNotifyItem } from '../entities/NotifyItem.js';
@@ -284,7 +284,8 @@ export class MessageAPI {
 
     while (!isEnd) {
       const data = await this.getReplyFeed(client, cursorId, cursorTime);
-      if (data.code !== 0 || !data.data?.items) break;
+      assertOk(data);
+      if (!data.data?.items) break;
 
       for (const item of data.data.items) yield item;
 
@@ -318,7 +319,8 @@ export class MessageAPI {
 
     while (!isEnd) {
       const data = await this.getAtFeed(client, cursorId, cursorTime);
-      if (data.code !== 0 || !data.data?.items) break;
+      assertOk(data);
+      if (!data.data?.items) break;
 
       for (const item of data.data.items) yield item;
 
@@ -386,7 +388,8 @@ export class MessageAPI {
 
     while (hasMore) {
       const data = await this.getSessions(client, sessionType, size, beginTs, sortRule);
-      if (data.code !== 0 || !data.data?.session_list?.length) break;
+      assertOk(data);
+      if (!data.data?.session_list?.length) break;
 
       yield { sessions: data.data.session_list, hasMore: data.data.has_more === 1 };
 
@@ -426,7 +429,8 @@ export class MessageAPI {
 
     while (hasMore) {
       const data = await this.getNewSessions(client, currentTs, size);
-      if (data.code !== 0 || !data.data?.session_list?.length) break;
+      assertOk(data);
+      if (!data.data?.session_list?.length) break;
 
       yield { sessions: data.data.session_list, hasMore: data.data.has_more === 1 };
 

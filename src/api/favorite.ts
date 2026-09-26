@@ -1,4 +1,4 @@
-import type { BiliClient } from '../core/client.js';
+import { assertOk, type BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import type { FavoriteFolder } from '../entities/FavoriteFolder.js';
 import type { FavoriteMediaEntity } from '../entities/FavoriteMediaEntity.js';
@@ -111,7 +111,8 @@ export class FavoriteAPI {
     let pn = 1;
     while (true) {
       const res = await this.getFolderList(client, mediaId, ps, pn);
-      if (res.code !== 0 || !res.data?.medias?.length) break;
+      assertOk(res);
+      if (!res.data?.medias?.length) break;
 
       for (const item of res.data.medias) yield item;
 

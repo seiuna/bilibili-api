@@ -168,7 +168,7 @@ describe('Dynamic Unlogin Test', () => {
       });
 
       const commentArea = dynamic.commentArea();
-      expect(commentArea.getOid).toBe(notify.subjectId);
+      expect(commentArea.getOid).toBe(String(notify.subjectId));
       expect(commentArea.getReplyType).toBe(notify.businessId);
     });
   });

@@ -1,4 +1,4 @@
-import type { BiliClient } from '../core/client.js';
+import { assertOk, type BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import { UploadAPI } from './upload.js';
 import type { Dynamic } from '../entities/Dynamic.js';
@@ -47,16 +47,16 @@ export interface DynamicDetail {
   item: {
     basic: {
       /**
-       * use this field to add comment to dynamic, fk bilibili.
+       * 评论区主体 OID；与 comment_type 配对使用，并保留字符串精度。
        */
       comment_id_str: string;
       /**
-       * This field is always 11 for dynamic.
+       * 上游评论区业务类型，取决于动态内容（如 1 视频、11 图文、12 专栏、17 文字）。
        */
       comment_type: number;
       jump_url?: string;
       /**
-       * same as comment_id_str.
+       * 关联资源 ID；不保证等于 comment_id_str，不应替代评论区 OID。
        */
       rid_str: string;
       title?: string;
@@ -311,7 +311,8 @@ export class DynamicAPI {
     let offset: string | undefined;
     while (true) {
       const res = await this.getSpace(client, hostMid, offset);
-      if (res.code !== 0 || !res.data?.items?.length) break;
+      assertOk(res);
+      if (!res.data?.items?.length) break;
 
       for (const item of res.data.items) yield item;
 

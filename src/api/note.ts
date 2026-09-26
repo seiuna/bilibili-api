@@ -1,4 +1,4 @@
-import type { BiliClient } from '../core/client.js';
+import { assertOk, type BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 
 export interface NoteInfo {
@@ -18,11 +18,14 @@ export interface NoteInfo {
 export interface NoteListItem {
   title: string;
   summary: string;
-  mtime: number;
+  /** 提交时间，格式 YYYY-MM-DD hh:mm。 */
+  mtime: string;
   arc: unknown;
-  note_id: string;
+  /** 上游数值 ID，可能超出安全整数范围；引用笔记请使用 note_id_str。 */
+  note_id: number;
   audit_status: number;
   web_url: string;
+  /** 无损笔记 ID；作为 getInfo/save/delete 的 noteId 参数传递。 */
   note_id_str: string;
   message: string;
   forbid_note_entrance: boolean;
@@ -84,7 +87,8 @@ export class NoteAPI {
     let total: number | null = null;
     while (true) {
       const res = await this.getUserNotes(client, ps, pn);
-      if (res.code !== 0 || !res.data?.list?.length) break;
+      assertOk(res);
+      if (!res.data?.list?.length) break;
 
       if (total === null && res.data.page?.total !== undefined) {
         total = res.data.page.total;
@@ -114,7 +118,7 @@ export class NoteAPI {
       publish?: boolean;
       autoComment?: boolean;
     } = {},
-  ): Promise<BiliApiResponse<{ note_id: string }>> {
+  ): Promise<BiliApiResponse<{ note_id: number }>> {
     const csrf = client.config.getCsrf();
     const body = new URLSearchParams({
       oid: String(oid),

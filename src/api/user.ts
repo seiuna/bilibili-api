@@ -409,9 +409,66 @@ export interface RewardStatus {
   identify_card: boolean;
 }
 
+/** 投稿视频列表中的常用原始字段；不转换成视频详情实体。 */
+export interface UserSubmission {
+  aid: number;
+  bvid: string;
+  title: string;
+  play: number;
+  created: number;
+  length: string;
+  pic: string;
+}
+
+/** 用户投稿单页响应，保留接口的 list.vlist / page 层级。 */
+export interface UserSubmissionsData {
+  list: { vlist: UserSubmission[] };
+  page: { pn: number; ps: number; count: number };
+}
+
+/** 关注用户的常用原始字段；face 为头像 URL，不重命名为 avatar。 */
+export interface UserFollowing {
+  mid: number;
+  uname: string;
+  sign: string;
+  face: string;
+}
+
+/** 关注列表单页响应；total 不保证等于当前账号可访问的条目数。 */
+export interface UserFollowingsData {
+  list: UserFollowing[];
+  total: number;
+  re_version?: number;
+}
+
 // ---- API 方法 ----
 
 export class UserAPI {
+  /** 获取用户投稿视频单页（pn=1，ps=30），通过统一请求通道进行 WBI 签名。 */
+  static async getSubmissions(
+    client: BiliClient<any>,
+    mid: number,
+    pn = 1,
+    ps = 30,
+  ): Promise<BiliApiResponse<UserSubmissionsData>> {
+    const params = new URLSearchParams({ mid: String(mid), pn: String(pn), ps: String(ps) });
+    return client.request(`https://api.bilibili.com/x/space/wbi/arc/search?${params}`, { wbi: true });
+  }
+
+  /** 获取用户关注单页（pn=1，ps=50，order='desc'），保留原始业务响应。 */
+  static async getFollowings(
+    client: BiliClient<any>,
+    vmid: number,
+    pn = 1,
+    ps = 50,
+    order: 'asc' | 'desc' = 'desc',
+  ): Promise<BiliApiResponse<UserFollowingsData>> {
+    const params = new URLSearchParams({
+      vmid: String(vmid), pn: String(pn), ps: String(ps), order,
+    });
+    return client.request(`https://api.bilibili.com/x/relation/followings?${params}`);
+  }
+
   /** 获取用户基本信息 */
   static async getInfo(client: BiliClient<any>, mid: number): Promise<BiliApiResponse<UserInfo>> {
     return client.request(
