@@ -12,6 +12,8 @@
 
 ## API 修复与安全约定
 
+- [完整公开 API 声明索引、字段与继承成员](./docs/api-reference.md)（从源码生成，可离线检查一致性）
+- [本次 issue 与风险审查记录](./docs/review-report.md)
 - [用户投稿与关注列表：参数、返回字段及 WBI](./docs/user-lists.md)
 - [评论 ID 精度、回复对话类型和实体行为](./docs/comment-identifiers.md)
 - [历史记录删除边界与游标分页](./docs/history-safety.md)
