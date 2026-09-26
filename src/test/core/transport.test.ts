@@ -97,6 +97,66 @@ describe('transport regressions (offline synthetic responses, no real credential
     ]);
   });
 
+  it('falls back to QR exactly once when nav remains unauthorized after successful refresh', async () => {
+    const urls: string[] = [];
+    const { client } = setup(async url => {
+      urls.push(String(url));
+      if (urls.length === 2) return Response.json({ code: 0, data: { refresh_token: 'new-token' } });
+      if (urls.length <= 3) return Response.json({ code: -101, message: 'expired' });
+      // Synthetic generate rejection: no QR rendering, polling, or real login.
+      return Response.json({ code: -400, message: 'offline QR sentinel' });
+    });
+    await expect(client.ensureLogin()).rejects.toThrow('offline QR sentinel');
+    expect(urls).toEqual([
+      'https://api.bilibili.com/x/web-interface/nav',
+      'https://passport.bilibili.com/x/passport-login/web/cookie/refresh',
+      'https://api.bilibili.com/x/web-interface/nav',
+      'https://passport.bilibili.com/x/passport-login/web/qrcode/generate',
+    ]);
+  });
+
+  it.each([false, true])('does not retry QR after explicit refresh recheck (unauthorized=%s)', async unauthorized => {
+    const urls: string[] = [];
+    const { client } = setup(async url => {
+      urls.push(String(url));
+      if (urls.length === 2 || (unauthorized && urls.length === 4)) {
+        return Response.json({ code: 0, data: {} });
+      }
+      if (urls.length === 1) return Response.json({ code: 0, data: { isLogin: false } });
+      if (urls.length === 3 || (unauthorized && urls.length === 5)) {
+        return Response.json(unauthorized ? { code: -101 } : { code: 0, data: { isLogin: false } });
+      }
+      return Response.json({ code: -400, message: 'offline QR sentinel' });
+    });
+    await expect(client.ensureLogin()).rejects.toThrow('offline QR sentinel');
+    expect(urls).toEqual([
+      'https://api.bilibili.com/x/web-interface/nav',
+      'https://passport.bilibili.com/x/passport-login/web/cookie/refresh',
+      'https://api.bilibili.com/x/web-interface/nav',
+      ...(unauthorized ? [
+        'https://passport.bilibili.com/x/passport-login/web/cookie/refresh',
+        'https://api.bilibili.com/x/web-interface/nav',
+      ] : []),
+      'https://passport.bilibili.com/x/passport-login/web/qrcode/generate',
+    ]);
+  });
+
+  it.each(['network', 'json', 'http', 'business', 'shape'])('propagates post-refresh nav %s failure without QR', async kind => {
+    let calls = 0;
+    const { client } = setup(async () => {
+      calls++;
+      if (calls === 1) return Response.json({ code: -101 });
+      if (calls === 2) return Response.json({ code: 0, data: {} });
+      if (kind === 'network') throw new Error('offline');
+      if (kind === 'json') return new Response('broken');
+      if (kind === 'http') return new Response('failed', { status: 500 });
+      if (kind === 'business') return Response.json({ code: -352, message: 'risk control' });
+      return Response.json({ code: 0, data: {} });
+    });
+    await expect(client.ensureLogin()).rejects.toThrow();
+    expect(calls).toBe(3);
+  });
+
   it('propagates non-auth refresh rejection without QR fallback', async () => {
     let calls = 0;
     const { client } = setup(async () => {

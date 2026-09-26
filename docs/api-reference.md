@@ -3536,12 +3536,12 @@ export {};
 ### Source parameter defaults
 
 - [src/core/client.ts:151](../src/core/client.ts#L151) — `rawRequest.options` = `{}`
-- [src/core/client.ts:310](../src/core/client.ts#L310) — `request.options` = `{}`
-- [src/core/client.ts:330](../src/core/client.ts#L330) — `checkedRequest.options` = `{}`
-- [src/core/client.ts:647](../src/core/client.ts#L647) — `getHistory.ps` = `20`
-- [src/core/client.ts:648](../src/core/client.ts#L648) — `getHistory.type` = `'all'`
-- [src/core/client.ts:659](../src/core/client.ts#L659) — `getHistoryPage.ps` = `20`
-- [src/core/client.ts:660](../src/core/client.ts#L660) — `getHistoryPage.type` = `'all'`
+- [src/core/client.ts:316](../src/core/client.ts#L316) — `request.options` = `{}`
+- [src/core/client.ts:336](../src/core/client.ts#L336) — `checkedRequest.options` = `{}`
+- [src/core/client.ts:653](../src/core/client.ts#L653) — `getHistory.ps` = `20`
+- [src/core/client.ts:654](../src/core/client.ts#L654) — `getHistory.type` = `'all'`
+- [src/core/client.ts:665](../src/core/client.ts#L665) — `getHistoryPage.ps` = `20`
+- [src/core/client.ts:666](../src/core/client.ts#L666) — `getHistoryPage.type` = `'all'`
 
 <a id="module-src-core-config-ts"></a>
 
@@ -6115,232 +6115,232 @@ isLoggedIn(): Promise<{ loggedIn: boolean; mid?: number; }>;
 ensureLogin(qrcodeOptions?: WebQrcodeLoginOptions): Promise<BiliClient<HasToken>>;
 ```
 
-**Instance `loginByQrcode`** — [src/core/client.ts:253](../src/core/client.ts#L253)
+**Instance `loginByQrcode`** — [src/core/client.ts:259](../src/core/client.ts#L259)
 ```ts
 loginByQrcode(options?: WebQrcodeLoginOptions): Promise<BiliClient<HasToken>>;
 ```
 
-**Instance `loginByTvQrcode`** — [src/core/client.ts:263](../src/core/client.ts#L263)
+**Instance `loginByTvQrcode`** — [src/core/client.ts:269](../src/core/client.ts#L269)
 ```ts
 loginByTvQrcode(options?: TvQrcodeLoginOptions): Promise<BiliClient<HasToken>>;
 ```
 
-**Instance `loginByPassword`** — [src/core/client.ts:273](../src/core/client.ts#L273)
+**Instance `loginByPassword`** — [src/core/client.ts:279](../src/core/client.ts#L279)
 ```ts
 loginByPassword(username: string, password: string, options?: { keep?: boolean; captcha?: { token?: string; challenge: string; validate: string; seccode: string; }; }): Promise<BiliClient<HasToken>>;
 ```
 
-**Instance `logout`** — [src/core/client.ts:295](../src/core/client.ts#L295)
+**Instance `logout`** — [src/core/client.ts:301](../src/core/client.ts#L301)
 ```ts
 logout(): Promise<BiliClient<void>>;
 ```
 
-**Instance `request`** — [src/core/client.ts:308](../src/core/client.ts#L308)
+**Instance `request`** — [src/core/client.ts:314](../src/core/client.ts#L314)
 ```ts
 request<TData = unknown>(url: string, options?: RequestInit): Promise<TData>;
 ```
 
-**Instance `checkedRequest`** — [src/core/client.ts:328](../src/core/client.ts#L328)
+**Instance `checkedRequest`** — [src/core/client.ts:334](../src/core/client.ts#L334)
 ```ts
 checkedRequest<TData extends { code?: number; message?: string; }>(url: string, options?: RequestInit): Promise<TData>;
 ```
 
-**Instance `getVideo`** — [src/core/client.ts:506](../src/core/client.ts#L506)
+**Instance `getVideo`** — [src/core/client.ts:512](../src/core/client.ts#L512)
 ```ts
 getVideo(bvid: string): Promise<Video>;
 ```
 
-**Instance `getVideoByAid`** — [src/core/client.ts:512](../src/core/client.ts#L512)
+**Instance `getVideoByAid`** — [src/core/client.ts:518](../src/core/client.ts#L518)
 ```ts
 getVideoByAid(aid: number): Promise<Video>;
 ```
 
-**Instance `getUser`** — [src/core/client.ts:518](../src/core/client.ts#L518)
+**Instance `getUser`** — [src/core/client.ts:524](../src/core/client.ts#L524)
 ```ts
 getUser(mid: number): Promise<User>;
 ```
 
-**Instance `getArticle`** — [src/core/client.ts:524](../src/core/client.ts#L524)
+**Instance `getArticle`** — [src/core/client.ts:530](../src/core/client.ts#L530)
 ```ts
 getArticle(cvid: number): Promise<Article>;
 ```
 
-**Instance `getDynamic`** — [src/core/client.ts:531](../src/core/client.ts#L531)
+**Instance `getDynamic`** — [src/core/client.ts:537](../src/core/client.ts#L537)
 ```ts
 getDynamic(id: string): Promise<Dynamic>;
 ```
 
-**Instance `getLiveRoom`** — [src/core/client.ts:537](../src/core/client.ts#L537)
+**Instance `getLiveRoom`** — [src/core/client.ts:543](../src/core/client.ts#L543)
 ```ts
 getLiveRoom(roomId: number): Promise<LiveRoom>;
 ```
 
-**Instance `getFavoriteFolder`** — [src/core/client.ts:543](../src/core/client.ts#L543)
+**Instance `getFavoriteFolder`** — [src/core/client.ts:549](../src/core/client.ts#L549)
 ```ts
 getFavoriteFolder(mediaId: number): Promise<FavoriteFolder>;
 ```
 
-**Instance `getOpus`** — [src/core/client.ts:549](../src/core/client.ts#L549)
+**Instance `getOpus`** — [src/core/client.ts:555](../src/core/client.ts#L555)
 ```ts
 getOpus(id: number | string): Promise<Opus>;
 ```
 
-**Instance `getComment`** — [src/core/client.ts:560](../src/core/client.ts#L560)
+**Instance `getComment`** — [src/core/client.ts:566](../src/core/client.ts#L566)
 ```ts
 getComment(oid: number | string, replyType: number, rpid: number | string): Promise<Comment>;
 ```
 
-**Instance `resolveComment`** — [src/core/client.ts:580](../src/core/client.ts#L580)
+**Instance `resolveComment`** — [src/core/client.ts:586](../src/core/client.ts#L586)
 ```ts
 resolveComment(rpid: number | string, hint?: { oid?: number | string; replyType?: number; }): Promise<Comment>;
 ```
 
-**Instance `getMyInfo`** — [src/core/client.ts:603](../src/core/client.ts#L603)
+**Instance `getMyInfo`** — [src/core/client.ts:609](../src/core/client.ts#L609)
 ```ts
 getMyInfo(this: RequireAuth<T> extends never ? never : BiliClient<T>): Promise<MyInfoEntity>;
 ```
 
-**Instance `getNavInfo`** — [src/core/client.ts:611](../src/core/client.ts#L611)
+**Instance `getNavInfo`** — [src/core/client.ts:617](../src/core/client.ts#L617)
 ```ts
 getNavInfo(this: RequireAuth<T> extends never ? never : BiliClient<T>): Promise<NavInfoEntity>;
 ```
 
-**Instance `getCurrentUser`** — [src/core/client.ts:626](../src/core/client.ts#L626)
+**Instance `getCurrentUser`** — [src/core/client.ts:632](../src/core/client.ts#L632)
 ```ts
 getCurrentUser(this: RequireAuth<T> extends never ? never : BiliClient<T>): Promise<User>;
 ```
 
-**Instance `getHistory`** — [src/core/client.ts:645](../src/core/client.ts#L645)
+**Instance `getHistory`** — [src/core/client.ts:651](../src/core/client.ts#L651)
 ```ts
 getHistory(this: RequireAuth<T> extends never ? never : BiliClient<T>, ps?: number, type?: "all" | "archive" | "live" | "article"): AsyncGenerator<HistoryItemEntity>;
 ```
 
-**Instance `getHistoryPage`** — [src/core/client.ts:657](../src/core/client.ts#L657)
+**Instance `getHistoryPage`** — [src/core/client.ts:663](../src/core/client.ts#L663)
 ```ts
 getHistoryPage(this: RequireAuth<T> extends never ? never : BiliClient<T>, ps?: number, type?: "all" | "archive" | "live" | "article", max?: number, viewAt?: number, business?: string): Promise<HistoryDataEntity>;
 ```
 
-**Instance `getToViewList`** — [src/core/client.ts:670](../src/core/client.ts#L670)
+**Instance `getToViewList`** — [src/core/client.ts:676](../src/core/client.ts#L676)
 ```ts
 getToViewList(this: RequireAuth<T> extends never ? never : BiliClient<T>): Promise<ToViewListEntity>;
 ```
 
-**Instance `getAtFeedPage`** — [src/core/client.ts:682](../src/core/client.ts#L682)
+**Instance `getAtFeedPage`** — [src/core/client.ts:688](../src/core/client.ts#L688)
 ```ts
 getAtFeedPage(this: RequireAuth<T> extends never ? never : BiliClient<T>, cursorId?: number, cursorTime?: number): Promise<AtFeedEntity>;
 ```
 
-**Instance `getReplyFeedPage`** — [src/core/client.ts:692](../src/core/client.ts#L692)
+**Instance `getReplyFeedPage`** — [src/core/client.ts:698](../src/core/client.ts#L698)
 ```ts
 getReplyFeedPage(this: RequireAuth<T> extends never ? never : BiliClient<T>, cursorId?: number, cursorTime?: number): Promise<ReplyFeedEntity>;
 ```
 
-**Instance `atFeed`** — [src/core/client.ts:702](../src/core/client.ts#L702)
+**Instance `atFeed`** — [src/core/client.ts:708](../src/core/client.ts#L708)
 ```ts
 atFeed(this: RequireAuth<T> extends never ? never : BiliClient<T>): AsyncGenerator<AtNotifyItem>;
 ```
 
-**Instance `replyFeed`** — [src/core/client.ts:712](../src/core/client.ts#L712)
+**Instance `replyFeed`** — [src/core/client.ts:718](../src/core/client.ts#L718)
 ```ts
 replyFeed(this: RequireAuth<T> extends never ? never : BiliClient<T>): AsyncGenerator<ReplyNotifyItem>;
 ```
 
-**Instance `createDynamic`** — [src/core/client.ts:725](../src/core/client.ts#L725)
+**Instance `createDynamic`** — [src/core/client.ts:731](../src/core/client.ts#L731)
 ```ts
 createDynamic(this: RequireAuth<T> extends never ? never : BiliClient<T>, contentOrOptions: string | import("../api/dynamic.js").CreateDynamicOptions): Promise<BiliApiResponse<import("../api/dynamic.js").CreateDynamicResult>>;
 ```
 
-**Instance `publishDynamic`** — [src/core/client.ts:735](../src/core/client.ts#L735)
+**Instance `publishDynamic`** — [src/core/client.ts:741](../src/core/client.ts#L741)
 ```ts
 publishDynamic(this: RequireAuth<T> extends never ? never : BiliClient<T>, contentOrOptions: string | import("../api/dynamic.js").CreateDynamicOptions): Promise<Dynamic>;
 ```
 
-**Instance `createVote`** — [src/core/client.ts:749](../src/core/client.ts#L749)
+**Instance `createVote`** — [src/core/client.ts:755](../src/core/client.ts#L755)
 ```ts
 createVote(this: RequireAuth<T> extends never ? never : BiliClient<T>, options: import("../api/dynamic.js").CreateVoteOptions): Promise<BiliApiResponse<import("../api/dynamic.js").CreateVoteResult>>;
 ```
 
-**Instance `comment`** — [src/core/client.ts:762](../src/core/client.ts#L762)
+**Instance `comment`** — [src/core/client.ts:768](../src/core/client.ts#L768)
 ```ts
 comment: typeof CommentAPI;
 ```
 
-**Instance `search`** — [src/core/client.ts:766](../src/core/client.ts#L766)
+**Instance `search`** — [src/core/client.ts:772](../src/core/client.ts#L772)
 ```ts
 search: typeof SearchAPI;
 ```
 
-**Instance `ranking`** — [src/core/client.ts:770](../src/core/client.ts#L770)
+**Instance `ranking`** — [src/core/client.ts:776](../src/core/client.ts#L776)
 ```ts
 ranking: typeof RankingAPI;
 ```
 
-**Instance `emoji`** — [src/core/client.ts:774](../src/core/client.ts#L774)
+**Instance `emoji`** — [src/core/client.ts:780](../src/core/client.ts#L780)
 ```ts
 emoji: typeof EmojiAPI;
 ```
 
-**Instance `live`** — [src/core/client.ts:778](../src/core/client.ts#L778)
+**Instance `live`** — [src/core/client.ts:784](../src/core/client.ts#L784)
 ```ts
 live: typeof LiveAPI;
 ```
 
-**Instance `dynamic`** — [src/core/client.ts:782](../src/core/client.ts#L782)
+**Instance `dynamic`** — [src/core/client.ts:788](../src/core/client.ts#L788)
 ```ts
 dynamic: typeof DynamicAPI;
 ```
 
-**Instance `article`** — [src/core/client.ts:786](../src/core/client.ts#L786)
+**Instance `article`** — [src/core/client.ts:792](../src/core/client.ts#L792)
 ```ts
 article: typeof ArticleAPI;
 ```
 
-**Instance `video`** — [src/core/client.ts:790](../src/core/client.ts#L790)
+**Instance `video`** — [src/core/client.ts:796](../src/core/client.ts#L796)
 ```ts
 video: typeof VideoAPI;
 ```
 
-**Instance `user`** — [src/core/client.ts:794](../src/core/client.ts#L794)
+**Instance `user`** — [src/core/client.ts:800](../src/core/client.ts#L800)
 ```ts
 user: typeof UserAPI;
 ```
 
-**Instance `opus`** — [src/core/client.ts:798](../src/core/client.ts#L798)
+**Instance `opus`** — [src/core/client.ts:804](../src/core/client.ts#L804)
 ```ts
 opus: typeof OpusAPI;
 ```
 
-**Instance `favorite`** — [src/core/client.ts:802](../src/core/client.ts#L802)
+**Instance `favorite`** — [src/core/client.ts:808](../src/core/client.ts#L808)
 ```ts
 favorite: typeof FavoriteAPI;
 ```
 
-**Instance `danmaku`** — [src/core/client.ts:806](../src/core/client.ts#L806)
+**Instance `danmaku`** — [src/core/client.ts:812](../src/core/client.ts#L812)
 ```ts
 danmaku: typeof DanmakuAPI;
 ```
 
-**Instance `message`** — [src/core/client.ts:814](../src/core/client.ts#L814)
+**Instance `message`** — [src/core/client.ts:820](../src/core/client.ts#L820)
 ```ts
 message: T extends HasToken ? typeof MessageAPI : never;
 ```
 
-**Instance `history`** — [src/core/client.ts:820](../src/core/client.ts#L820)
+**Instance `history`** — [src/core/client.ts:826](../src/core/client.ts#L826)
 ```ts
 history: T extends HasToken ? typeof HistoryAPI : never;
 ```
 
-**Instance `note`** — [src/core/client.ts:826](../src/core/client.ts#L826)
+**Instance `note`** — [src/core/client.ts:832](../src/core/client.ts#L832)
 ```ts
 note: T extends HasToken ? typeof NoteAPI : never;
 ```
 
-**Instance `electric`** — [src/core/client.ts:832](../src/core/client.ts#L832)
+**Instance `electric`** — [src/core/client.ts:838](../src/core/client.ts#L838)
 ```ts
 electric: T extends HasToken ? typeof ElectricAPI : never;
 ```
 
-**Instance `upload`** — [src/core/client.ts:838](../src/core/client.ts#L838)
+**Instance `upload`** — [src/core/client.ts:844](../src/core/client.ts#L844)
 ```ts
 upload: T extends HasToken ? typeof UploadAPI : never;
 ```

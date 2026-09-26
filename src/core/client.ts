@@ -220,7 +220,10 @@ export class BiliClient<T = void> {
     try {
       status = await this.isLoggedIn();
     } catch (error) {
-      if (!(error instanceof CredentialRefreshError) || error.code !== -101) throw error;
+      // The nav probe is a GET: AuthRequiredError here means its post-refresh
+      // retry explicitly returned -101, not an unsafe write replay.
+      if (!(error instanceof AuthRequiredError) &&
+          !(error instanceof CredentialRefreshError && error.code === -101)) throw error;
       status = { loggedIn: false };
       refreshRejected = true;
     }
@@ -228,16 +231,19 @@ export class BiliClient<T = void> {
     if (loggedIn) {
       if (mid) await this.config.updateMid(mid);
     } else if (this.config.data.refreshToken && !refreshRejected) {
+      let needsQrcode: boolean;
       try {
         const fetcher = this.customFetch ?? fetch;
         await this.performRefresh(fetcher);
         const recheck = await this.isLoggedIn();
-        if (!recheck.loggedIn) {
-          const result = await loginByWebQrcode(this.config, qrcodeOptions, this.customFetch ?? fetch);
-          if (!result.success) throw new AuthRequiredError(result.message);
-        }
+        needsQrcode = !recheck.loggedIn;
       } catch (error) {
-        if (!(error instanceof CredentialRefreshError) || error.code !== -101) throw error;
+        if (!(error instanceof AuthRequiredError) &&
+            !(error instanceof CredentialRefreshError && error.code === -101)) throw error;
+        needsQrcode = true;
+      }
+      // Keep QR outside the refresh catch: its own failure must never retry QR.
+      if (needsQrcode) {
         const result = await loginByWebQrcode(this.config, qrcodeOptions, this.customFetch ?? fetch);
         if (!result.success) throw new AuthRequiredError(result.message);
       }
