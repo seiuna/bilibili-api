@@ -154,7 +154,7 @@ node --import tsx scripts/generate-api-reference.ts
 node --import tsx scripts/generate-api-reference.ts --check
 \`\`\`
 
-The check command fails if this file is absent or differs byte-for-byte from current source emission. Neither command builds dist, contacts Bilibili, logs in, or runs examples. The compiler checks the reachable source graph before emitting declarations in memory.
+The check command fails if this file is absent or differs from current source emission after normalizing CRLF checkout line endings to LF. Neither command builds dist, contacts Bilibili, logs in, or runs examples. The compiler checks the reachable source graph before emitting declarations in memory.
 
 ## Scope and interpretation
 
@@ -190,7 +190,8 @@ ${sections.join('\n')}
 ${classSections.join('\n')}
 `.trimEnd() + '\n';
 if (process.argv.includes('--check')) {
-  if (!existsSync(output) || readFileSync(output, 'utf8') !== document) {
+  // Git may check Markdown out as CRLF on Windows; line endings are not API drift.
+  if (!existsSync(output) || readFileSync(output, 'utf8').replace(/\r\n/g, '\n') !== document) {
     console.error('API reference is missing or stale. Run the generator without --check.');
     process.exitCode = 1;
   } else console.log(`API reference is current: ${summary}.`);
