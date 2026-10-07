@@ -10,18 +10,6 @@
 
 </div>
 
-## API 修复与安全约定
-
-- [完整公开 API 声明索引、字段与继承成员](./docs/api-reference.md)（从源码生成，可离线检查一致性）
-- [本次 issue 与风险审查记录](./docs/review-report.md)
-- [用户投稿与关注列表：参数、返回字段及 WBI](./docs/user-lists.md)
-- [评论 ID 精度、回复对话类型和实体行为](./docs/comment-identifiers.md)
-- [历史记录删除边界与游标分页](./docs/history-safety.md)
-- [文章身份与视频/文章读取错误](./docs/article-video-read-safety.md)
-- [分页与原始响应契约](./docs/api-pagination-contracts.md)
-- [认证流程与传输约定](./docs/authentication.md)
-- [HTTP、匿名请求、凭证刷新及 WBI 边界](./docs/transport.md)
-
 ## 测试
 
 | 命令 | 范围 |
