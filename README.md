@@ -10,18 +10,6 @@
 
 </div>
 
-## API 修复与安全约定
-
-- [完整公开 API 声明索引、字段与继承成员](./docs/api-reference.md)（从源码生成，可离线检查一致性）
-- [本次 issue 与风险审查记录](./docs/review-report.md)
-- [用户投稿与关注列表：参数、返回字段及 WBI](./docs/user-lists.md)
-- [评论 ID 精度、回复对话类型和实体行为](./docs/comment-identifiers.md)
-- [历史记录删除边界与游标分页](./docs/history-safety.md)
-- [文章身份与视频/文章读取错误](./docs/article-video-read-safety.md)
-- [分页与原始响应契约](./docs/api-pagination-contracts.md)
-- [认证流程与传输约定](./docs/authentication.md)
-- [HTTP、匿名请求、凭证刷新及 WBI 边界](./docs/transport.md)
-
 ## 测试
 
 | 命令 | 范围 |
@@ -49,7 +37,7 @@ BILI_TEST_PROFILE=你的UID或Profile别名 npm run test:login
 
 也可指定包含路径分隔符的配置文件路径。缺少配置、凭证失效、网络错误或 API 非零业务码都会使登录测试失败，不会作为成功跳过。凭证应保存在已被 Git 忽略的 `profiles/` 中，不要提交或打印 Cookie。默认测试无需设置 `BILI_TEST_PROFILE`，即使设置了也不会运行登录测试。原 `full-test` 脚本由 `test:all` 取代。
 
-### 创建动态并发表评论（真实写操作，仅显式运行）
+### 创建动态并发表评论
 
 `src/test/dynamic/create-comment.write.test.ts` 使用真实账号创建一条带唯一标记的纯文字动态，确认评论区类型及字符串 ID，发表评论，再读取评论验证正文、作者与根评论关系。测试结束时，无论中间断言是否失败，都会尝试删除本次创建的动态；删除失败会报错并输出动态链接。若创建请求超时或返回值缺少 ID，可能无法自动清理，请手动检查账号。测试内容可能在删除前被他人看到。
 
