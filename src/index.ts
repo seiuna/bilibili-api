@@ -5,6 +5,7 @@
 // ---- Core 层 ----
 export { BiliClient, CredentialRefreshError, AuthRequiredError, BiliApiError, assertOk } from './core/client.js';
 export type { RequestInit, HasToken } from './core/client.js';
+export type { WebCommentOptions } from './core/web-comment.js';
 export { ConfigManager } from './core/config.js';
 export type { ProfileUser, ProfileFilter, FromProfilesOptions } from './core/config.js';
 export { logger, getLogger, configureLogger, setLogger, log4js } from './core/logger.js';
