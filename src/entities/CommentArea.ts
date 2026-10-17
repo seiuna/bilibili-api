@@ -17,6 +17,7 @@ import {
 } from '../api/comment.js';
 import type { UploadImageResult } from '../api/upload.js';
 import { assertOk, type BiliClient } from '../core/client.js';
+import { addWebCommentFields, webCommentHeaders, webCommentQuery, type WebCommentOptions } from '../core/web-comment.js';
 
 /**
  * 绑定到具体评论区 (oid + replyType) 的高层封装
@@ -80,6 +81,7 @@ export class CommentArea {
     root: number | string = 0,
     parent: number | string = 0,
     pictures?: UploadImageResult[],
+    options: WebCommentOptions = {},
   ): Promise<BiliApiResponse<ReplyAddResult>> {
     const csrf = this.client.config.getCsrf();
     const body = new URLSearchParams({
@@ -104,12 +106,20 @@ export class CommentArea {
       body.set('pictures', JSON.stringify(mapped));
     }
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    let url = 'https://api.bilibili.com/x/v2/reply/add';
+    if (options.webCompatibility) {
+      Object.assign(headers, await webCommentHeaders(this.client));
+      addWebCommentFields(body, csrf);
+      url += `?${webCommentQuery()}`;
+    }
     return this.client.checkedRequest<BiliApiResponse<ReplyAddResult>>(
-      'https://api.bilibili.com/x/v2/reply/add',
+      url,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers,
         body: body.toString(),
+        wbi: options.webCompatibility,
       },
     );
   }

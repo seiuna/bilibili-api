@@ -2,6 +2,7 @@ import type { BiliClient } from '../core/client.js';
 import type { BiliApiResponse } from '../core/types.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { webCommentHeaders, type WebCommentOptions } from '../core/web-comment.js';
 
 export interface UploadImageResult {
   image_url: string;
@@ -13,10 +14,10 @@ export interface UploadImageResult {
 
 export class UploadAPI {
   /** 上传本地图片文件 */
-  static async image(client: BiliClient<any>, filePath: string): Promise<BiliApiResponse<UploadImageResult>> {
+  static async image(client: BiliClient<any>, filePath: string, options: WebCommentOptions = {}): Promise<BiliApiResponse<UploadImageResult>> {
     const buffer = await fs.readFile(filePath);
     const filename = path.basename(filePath);
-    return UploadAPI.uploadBuffer(client, buffer, filename);
+    return UploadAPI.uploadBuffer(client, buffer, filename, options);
   }
 
   /** 上传 base64 图片 */
@@ -62,6 +63,7 @@ export class UploadAPI {
     client: BiliClient<any>,
     buffer: Buffer,
     filename: string,
+    options: WebCommentOptions = {},
   ): Promise<BiliApiResponse<UploadImageResult>> {
     const csrf = client.config.getCsrf();
 
@@ -96,6 +98,9 @@ export class UploadAPI {
     parts.push(Buffer.from(csrf));
     parts.push(Buffer.from(crlf));
 
+    if (options.webCompatibility) {
+      parts.push(Buffer.from(`--${boundary}${crlf}Content-Disposition: form-data; name="csrf_token"${crlf}${crlf}${csrf}${crlf}`));
+    }
     parts.push(Buffer.from(`--${boundary}--${crlf}`));
 
     const body = Buffer.concat(parts);
@@ -105,6 +110,7 @@ export class UploadAPI {
     if (client.config.data.cookie) {
       headers['Cookie'] = client.config.data.cookie;
     }
+    if (options.webCompatibility) Object.assign(headers, await webCommentHeaders(client));
 
     return client.request('https://api.bilibili.com/x/dynamic/feed/draw/upload_bfs', {
       method: 'POST',
