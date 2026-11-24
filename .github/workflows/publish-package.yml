@@ -28,6 +28,7 @@ jobs:
 
       - name: Publish to npm
         run: |
+          npm --version
           if [ "${{ github.event.release.prerelease }}" = "true" ]; then
             npm publish --provenance --access public --tag beta
           else
