@@ -1,5 +1,7 @@
 import { ConfigManager } from './config.js';
 import { wbiSign } from './sign.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import {
   loginByWebQrcode,
   loginByTvQrcode,
@@ -32,6 +34,7 @@ import { RankingAPI } from '../api/ranking.js';
 import { LiveAPI } from '../api/live.js';
 import { UploadAPI } from '../api/upload.js';
 import { OpusAPI } from '../api/opus.js';
+import { CreativeAPI } from '../api/creative.js';
 
 // Entity 层导入
 import { Video } from '../entities/Video.js';
@@ -50,6 +53,8 @@ import { ToViewListEntity } from '../entities/ToViewListEntity.js';
 import { AtFeedEntity } from '../entities/AtFeedEntity.js';
 import { ReplyFeedEntity } from '../entities/ReplyFeedEntity.js';
 import { AtNotifyItem, ReplyNotifyItem } from '../entities/NotifyItem.js';
+import { VideoUploadSession } from '../entities/VideoUploadSession.js';
+import type { CreateVideoUploadOptions } from '../entities/VideoUploadSession.js';
 
 // ==========================================
 // 认证状态标记类型
@@ -110,7 +115,9 @@ export function assertOk<T extends { code: number; message: string }>(data: T): 
 export interface RequestInit {
   method?: string;
   headers?: Record<string, string>;
-  body?: string | Uint8Array;
+  body?: string | Uint8Array | FormData;
+  /** 可选中止信号 / 超时控制 */
+  signal?: AbortSignal;
   /** 是否需要 WBI 签名 */
   wbi?: boolean;
   /** 是否自动检查 code（非 0 抛异常） */
@@ -406,6 +413,7 @@ export class BiliClient<T = void> {
       method: options.method ?? 'GET',
       headers: headers as any,
       body: options.body as BodyInit | undefined,
+      ...(options.signal ? { signal: options.signal } : {}),
     });
 
     if (!isAnonymous) {
@@ -759,6 +767,49 @@ export class BiliClient<T = void> {
     return DynamicAPI.createVote(this, options);
   }
 
+  // ------------------------------------------
+  // 视频投稿 — 需要登录
+  // ------------------------------------------
+
+  /**
+   * 创建视频上传会话 — 需要登录
+   *
+   * 只做「预上传」（换取 5 天有效期的上传凭证），**不传输文件字节**。
+   * 返回的 {@link VideoUploadSession} 上设置标题/分区/标签等元数据，
+   * 再调用 `upload()` 上传、`publish()` 投递，或 `submit()` 一步完成。
+   *
+   * @param filePath 本地视频文件路径
+   *
+   * @example
+   * ```ts
+   * const session = await client.createVideoUpload('./video.mp4');
+   * await session.setTitle('标题').setPartition(122).setTags(['编程']).submit();
+   * ```
+   */
+  async createVideoUpload(
+    this: RequireAuth<T> extends never ? never : this,
+    filePath: string,
+    options?: CreateVideoUploadOptions,
+  ): Promise<VideoUploadSession> {
+    const stat = await fs.stat(filePath);
+    if (!stat.isFile()) throw new Error(`${filePath} 不是文件`);
+    if (stat.size <= 0) throw new Error(`${filePath} 文件为空（0 字节），无法上传`);
+    const filename = options?.name ?? path.basename(filePath);
+    const ticket = await CreativeAPI.preupload(
+      this as BiliClient<any>,
+      filename,
+      stat.size,
+    );
+    return new VideoUploadSession(
+      this as BiliClient<any>,
+      ticket,
+      filePath,
+      filename,
+      stat.size,
+      options,
+    );
+  }
+
   // ==========================================
   // 子 API 懒加载 — 公开（无需登录）
   // ==========================================
@@ -837,6 +888,12 @@ export class BiliClient<T = void> {
   /** 充电 API — 需要登录 */
   get electric(): T extends HasToken ? typeof ElectricAPI : never {
     return (this._electric ?? (this._electric = ElectricAPI)) as unknown as T extends HasToken ? typeof ElectricAPI : never;
+  }
+
+  private _creative: typeof CreativeAPI | null = null;
+  /** 创作中心（投稿）API — 需要登录 */
+  get creative(): T extends HasToken ? typeof CreativeAPI : never {
+    return (this._creative ?? (this._creative = CreativeAPI)) as unknown as T extends HasToken ? typeof CreativeAPI : never;
   }
 
   private _upload: typeof UploadAPI | null = null;

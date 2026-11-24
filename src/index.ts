@@ -179,6 +179,37 @@ export type { OpusDetail, OpusSpaceItem, OpusSpaceData } from './api/opus.js';
 export { UploadAPI } from './api/upload.js';
 export type { UploadImageResult } from './api/upload.js';
 
+export {
+  CreativeAPI,
+  UPLOAD_PROFILE,
+  COPYRIGHT,
+  CREATION_STATEMENT,
+  SPACE_HIDDEN,
+  extractUposFilename,
+} from './api/creative.js';
+export type {
+  PreuploadResult,
+  InitUploadResult,
+  FinishUploadResult,
+  UploadedPart,
+  UposRequestOptions,
+  ArchivePreData,
+  CreationStatementItem,
+  PredictedArchiveType,
+  SeasonSectionItem,
+  SeasonItem,
+  TopicItem,
+  TopicSearchData,
+  ArchiveRichTextNode,
+  ArchiveStaff,
+  ArchiveListItem,
+  ArchiveListData,
+  ArchiveVideoItem,
+  AddArchivePayload,
+  AddArchiveResult,
+  UploadProgress,
+} from './api/creative.js';
+
 export { CommonAPI } from './api/common.js';
 export type { IpLocationInfo } from './api/common.js';
 export { getCurrentTimestamp, av2bv, bv2av, formatImageUrl, getImageAvgColor, getIpLocation, getServerTimestamp } from './api/common.js';
@@ -196,6 +227,13 @@ export { LiveRoom } from './entities/LiveRoom.js';
 export { FavoriteFolder } from './entities/FavoriteFolder.js';
 export { Comment } from './entities/Comment.js';
 export { CommentArea } from './entities/CommentArea.js';
+export { VideoUploadSession } from './entities/VideoUploadSession.js';
+export type {
+  CreateVideoUploadOptions,
+  VideoVisibility,
+  SubtitleEntry,
+  VideoPartOptions,
+} from './entities/VideoUploadSession.js';
 export { NotifyURIHelper, ReplyNotifyItem, AtNotifyItem } from './entities/NotifyItem.js';
 
 // 附属实体（与 raw 类型区分，统一 Entity 后缀）
