@@ -349,6 +349,21 @@ await area.add('回复内容', rootRpid, parentRpid);
 // 上传图片后发表带图评论
 const img = await authed.upload.image(authed, './cat.png');
 await area.add('带图评论', 0, 0, [img.data]);
+
+#### 可选的网页请求兼容模式
+
+仅 `code=0` 或作者能读回，不能证明其他账号能读到。对图片评论可显式启用额外网页请求元数据：
+
+```ts
+const options = { webCompatibility: true };
+const img = await authed.upload.image(authed, './cat.png', options);
+if (img.code !== 0) throw new Error('图片上传失败');
+const posted = await area.add('带图评论', 0, 0, [img.data], options);
+```
+
+此模式通过统一请求通道获取缺失的 buvid3/4 并保存到所选 Profile，添加 WBI/dm 查询、csrf_token、gaia_source 和观测到的统计表单编码、UA/Referer。保留原有图片 AI 标记，不添加小写登录 Cookie 别名或重写已有登录值；未启用时保持原请求行为。
+
+该模式来自与 Python 17.4.2 成功请求的差异分析，仍是实验性兼容选项。本补丁的精简实现尚未做真实发评验证；不保证通过审核或公开显示。拿到评论 ID 后应分别用作者、匿名和可选第二账号核对正文及图片 URL；发送结果不确定时先核对原请求，不自动重发。默认单元测试不会发表评论。
 ```
 
 ### 点赞 / 点踩 / 删除 / 举报 / 置顶
